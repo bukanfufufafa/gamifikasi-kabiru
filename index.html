@@ -1,1 +1,49 @@
-<h1>fadil ❤️ ojan</h1>
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Petani Blok: Panen Padi</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <h1>🌾 Petani Blok</h1>
+  <p>Susun blok perintah, lalu jalankan agar petani memanen semua padi.</p>
+</header>
+<main>
+  <section class="panel">
+    <h2>Blok perintah</h2>
+    <div class="pal" id="pal"></div>
+    <h2>Programmu</h2>
+    <div class="ws"><div class="slot root" id="root"></div></div>
+    <div class="bar">
+      <button class="b g" id="ex">Lihat contoh</button>
+      <button class="b g" id="clr">Kosongkan</button>
+    </div>
+    <p class="note">Seret blok ke area program, atau ketuk blok. Ketuk area di dalam blok “ulangi”, “jika”, atau “selama” untuk mengisinya.</p>
+  </section>
+  <section class="panel game">
+    <h2 id="lvt"></h2>
+    <div class="field" id="field"></div>
+    <p class="note" style="text-align:center">🖱️ Seret ladang untuk memutar kamera 3D.</p>
+    <div class="stat"><span id="goal"></span><span id="sc"></span></div>
+    <div class="msg" id="msg"></div>
+    <div class="bar center">
+      <button class="b" id="run">▶ Jalankan</button>
+      <button class="b g" id="rst">↺ Ulang</button>
+      <button class="b g" id="nx" hidden>Level berikutnya</button>
+      <label class="sp">Cepat <input type="range" id="spd" min="1" max="10" value="6"></label>
+    </div>
+  </section>
+</main>
+<!-- Urutan penting: three -> config -> world -> interpreter -> view -> editor -> main -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/world.js"></script>
+<script src="js/interpreter.js"></script>
+<script src="js/view.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

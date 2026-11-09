@@ -1,0 +1,49 @@
+/* ===== Tema (ubah warna di sini) ===== */
+:root{box-sizing:border-box;
+--bg:#e6efd9;--pn:#fbfdf6;--tx:#1f2a1c;--mu:#5d6b57;--bd:#c5d3b6;--soil:#b5834f;--soil2:#9a6c3d;--ws:#f2f7ea;
+--sky1:#bfe3ff;--sky2:#e3f2d3;--mv:#4c97ff;--ac:#3fae4a;--ct:#f0a000;--btn:#2f7d32;--btnt:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#172016;--pn:#1f2c1e;--tx:#e8f1e0;--mu:#9db293;--bd:#344a32;--soil:#8a6238;--soil2:#6f4d2b;--ws:#182517;--btn:#5fc263;--btnt:#10200f;--sky1:#1b3045;--sky2:#1c2c1a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:500 16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+
+/* ===== Layout ===== */
+header{padding:14px 18px 4px}
+h1{margin:0;font-size:1.6rem}
+header p{margin:2px 0 0;color:var(--mu)}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;padding:12px 18px 24px;max-width:1200px;margin:0 auto}
+@media (max-width:820px){main{grid-template-columns:1fr}.game{order:-1}}
+.panel{background:var(--pn);border:2px solid var(--bd);border-radius:14px;padding:12px}
+h2{margin:0 0 8px;font-size:1.05rem}
+.note{color:var(--mu);font-size:.85rem;margin:8px 0 0}
+
+/* ===== Blok & editor ===== */
+.pal{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.blk{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:#fff;border-radius:8px;padding:6px 10px;font-weight:700;font-size:.95rem;user-select:none}
+.blk.mv{background:var(--mv)}.blk.ac{background:var(--ac)}.blk.ct{background:var(--ct);color:#2a1d00;flex-direction:column;align-items:stretch}
+.pal .blk{cursor:grab;box-shadow:0 2px 0 rgba(0,0,0,.22)}
+.ws{background:var(--ws);border:2px dashed var(--bd);border-radius:10px;padding:8px;min-height:240px}
+.slot{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-height:34px;padding:5px;border-radius:8px;border:2px dashed transparent}
+.slot.root{min-height:220px}
+.slot:empty::before{content:"letakkan blok di sini";color:var(--mu);font-size:.85rem;font-weight:500}
+.slot.act{border-color:var(--ct)}
+.slot.over{background:rgba(76,151,255,.18)}
+.blk.ct>.slot{background:rgba(0,0,0,.12);margin-left:10px;border-left:4px solid rgba(0,0,0,.25)}
+.row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+select,input[type=number]{font:inherit;font-size:.9rem;border-radius:6px;border:0;padding:1px 4px;background:#fff;color:#1f2a1c}
+input[type=number]{width:52px}
+.x{margin-left:auto;background:rgba(0,0,0,.25);color:#fff;border:0;border-radius:50%;width:22px;height:22px;cursor:pointer;font:inherit;font-weight:700;line-height:1}
+
+/* ===== Tombol ===== */
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.bar.center{justify-content:center}
+button.b{font:inherit;font-weight:700;border:0;border-radius:10px;padding:8px 14px;cursor:pointer;background:var(--btn);color:var(--btnt)}
+button.b.g{background:transparent;color:var(--tx);border:2px solid var(--bd)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #ffb300;outline-offset:2px}
+label.sp{display:flex;align-items:center;gap:6px;color:var(--mu);font-size:.9rem}
+
+/* ===== Ladang 3D ===== */
+.field{width:100%;max-width:560px;aspect-ratio:4/3;margin:0 auto;border-radius:12px;overflow:hidden;border:2px solid var(--bd);background:linear-gradient(var(--sky1),var(--sky2));color:var(--mu);font-size:.9rem}
+.field canvas{cursor:grab}.field canvas:active{cursor:grabbing}
+.stat{display:flex;justify-content:space-between;gap:8px;margin:8px auto 0;max-width:560px;font-weight:700}
+.msg{min-height:2.6em;margin:8px auto 0;max-width:560px;color:var(--mu)}
+.msg.ok{color:var(--btn)}.msg.er{color:#d6452f}
