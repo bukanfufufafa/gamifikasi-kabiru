@@ -1,44 +1,47 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Petani Blok: Panen Padi</title>
+<title>Block Farmer: Wheat Harvest</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<header>
-  <h1>🌾 Petani Blok</h1>
-  <p>Susun blok perintah, lalu jalankan agar petani memanen semua padi.</p>
+<header class="menubar">
+  <h1>🌾 Block Farmer</h1>
+  <span class="menu-lv" id="lvt"></span>
+  <button class="b nx" id="nx" hidden>Next level ▸</button>
 </header>
-<main>
-  <section class="panel">
-    <h2>Blok perintah</h2>
-    <div class="pal" id="pal"></div>
-    <h2>Programmu</h2>
-    <div class="ws"><div class="slot root" id="root"></div></div>
-    <div class="bar">
-      <button class="b g" id="ex">Lihat contoh</button>
-      <button class="b g" id="clr">Kosongkan</button>
-    </div>
-    <p class="note">Seret blok ke area program, atau ketuk blok. Ketuk area di dalam blok “ulangi”, “jika”, atau “selama” untuk mengisinya.</p>
+<main class="app">
+  <section class="code-pane">
+    <div class="tabs"><span class="tab"><i class="ic">&lt;/&gt;</i> Code</span></div>
+    <div class="blockly-host" id="blockly"></div>
   </section>
-  <section class="panel game">
-    <h2 id="lvt"></h2>
+  <section class="stage-pane">
+    <div class="stage-bar">
+      <button class="icon go" id="run" title="Run (green flag)" aria-label="Run">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M5 21V4" stroke="#2f8a3a" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M5.6 4.6c3.6-2 6.2 1.8 12.4-.4v9c-6.2 2.2-8.8-1.6-12.4.4z" fill="#4cbf56" stroke="#2f8a3a" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="icon stop" id="rst" title="Stop and reset" aria-label="Stop and reset">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z" fill="#ec5959" stroke="#c43c3c" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="stat"><span id="goal"></span><b id="sc"></b></span>
+    </div>
     <div class="field" id="field"></div>
-    <p class="note" style="text-align:center">🖱️ Seret ladang untuk memutar kamera 3D.</p>
-    <div class="stat"><span id="goal"></span><span id="sc"></span></div>
-    <div class="msg" id="msg"></div>
-    <div class="bar center">
-      <button class="b" id="run">▶ Jalankan</button>
-      <button class="b g" id="rst">↺ Ulang</button>
-      <button class="b g" id="nx" hidden>Level berikutnya</button>
-      <label class="sp">Cepat <input type="range" id="spd" min="1" max="10" value="6"></label>
+    <p class="hint3d">🖱️ Drag the field to rotate the 3D camera.</p>
+    <div class="card">
+      <div class="msg" id="msg"></div>
+      <div class="bar">
+        <button class="b g" id="ex">Show example</button>
+        <button class="b g" id="clr">Clear blocks</button>
+        <label class="sp">Speed <input type="range" id="spd" min="1" max="10" value="6"></label>
+      </div>
     </div>
   </section>
 </main>
-<!-- Urutan penting: three -> config -> world -> interpreter -> view -> editor -> main -->
+<!-- Order matters: three -> blockly -> config -> world -> interpreter -> view -> editor -> main -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="lib/blockly.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/world.js"></script>
 <script src="js/interpreter.js"></script>

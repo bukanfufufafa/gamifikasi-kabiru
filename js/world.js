@@ -1,48 +1,43 @@
-/* world.js — keadaan dunia (ladang, posisi petani, skor). Tanpa DOM, tanpa UI. */
+/* world.js — world state (field, farmer position, score). No DOM, no UI. */
 Petani.World = (function () {
   const C = Petani.Config;
-  const EMPTY = 0, YOUNG = 1, RIPE = 2;
-  let level, N, grid, pos, score, tick;
+  let level, map, N, grid, pos, score, goal, bumps, bumpDir;
 
-  // Membangun ladang dari level.map (lihat LEVELS di config.js)
-  function load(index) {
-    level = C.LEVELS[index]; N = level.size;
-    grid = level.map.map((row) => [...row].map((ch) => ({ s: C.TILE[ch], plantedAt: 0 })));
-    pos = level.start.slice(); score = 0; tick = 0;
+  // Build the field from level.maps[size] (see LEVELS in config.js)
+  function load(index, size) {
+    level = C.LEVELS[index]; N = size; map = level.maps[size];
+    grid = map.map((row) => [...row].map((ch) => ({ wheat: ch === "W", rock: ch === "#" })));
+    pos = level.start.slice(); score = 0; bumps = 0; bumpDir = [0, 0];
+    goal = grid.flat().filter((c) => c.wheat).length;
   }
 
   const inside = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
+  const free = (x, y) => inside(x, y) && !grid[y][x].rock; // the farmer can only walk on non-rock tiles
   const cell = () => grid[pos[1]][pos[0]];
 
-  // Setiap aksi memakan 1 langkah waktu; padi muda tumbuh seiring waktu.
-  function advance() {
-    tick++;
-    for (const row of grid) for (const g of row)
-      if (g.s === YOUNG && tick - g.plantedAt >= C.GROW) g.s = RIPE;
-  }
-
-  // Cek kondisi untuk blok "jika" / "selama"
+  // Conditions for if / while / repeat until
   function test(cond) {
-    if (cond === "matang") return cell().s === RIPE;
-    if (cond === "muda") return cell().s === YOUNG;
-    if (cond === "kosong") return cell().s === EMPTY;
-    const neg = cond.startsWith("no_");
-    const v = C.DIR_VEC[neg ? cond.slice(3) : cond];
-    const ok = inside(pos[0] + v[0], pos[1] + v[1]);
-    return neg ? !ok : ok;
+    if (cond === "wheat") return cell().wheat;
+    if (cond === "nowheat") return !cell().wheat;
+    if (cond === "any") return grid.some((row) => row.some((c) => c.wheat));
+    const [kind, dir] = cond.split("_"), v = C.DIR_VEC[dir], x = pos[0] + v[0], y = pos[1] + v[1];
+    if (kind === "can") return free(x, y);
+    if (kind === "no") return !free(x, y);
+    return inside(x, y) && grid[y][x].wheat; // "wheat_<dir>"
   }
 
-  // Aksi petani (dipanggil oleh interpreter)
+  // Farmer actions (called by the interpreter)
   const actions = {
-    move(dir) { const v = C.DIR_VEC[dir], x = pos[0] + v[0], y = pos[1] + v[1]; if (inside(x, y)) pos = [x, y]; advance(); },
-    plant() { const g = cell(); if (g.s === EMPTY) { g.s = YOUNG; g.plantedAt = tick; } advance(); },
-    harvest() { const g = cell(); if (g.s === RIPE) { g.s = EMPTY; score++; } advance(); },
-    wait() { advance(); }
+    move(dir) {
+      const v = C.DIR_VEC[dir], x = pos[0] + v[0], y = pos[1] + v[1];
+      if (free(x, y)) pos = [x, y]; else { bumps++; bumpDir = v; } // blocked by a rock or the edge
+    },
+    harvest() { const c = cell(); if (c.wheat) { c.wheat = false; score++; } }
   };
 
   return {
-    EMPTY, YOUNG, RIPE, load, test, actions,
-    isWon: () => score >= level.goal,
-    get state() { return { size: N, grid, pos, score, level }; }
+    load, test, actions,
+    isWon: () => score >= goal,
+    get state() { return { size: N, grid, map, pos, score, goal, bumps, bumpDir, level }; }
   };
 })();

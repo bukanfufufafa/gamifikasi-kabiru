@@ -1,57 +1,61 @@
-/* main.js — menghubungkan semua modul: tombol, level, loop eksekusi. */
+/* main.js — wires all modules together: buttons, levels, grid size, run loop. */
 (function () {
   const { Config, World, Interpreter, View, Editor } = Petani;
   const $ = (s) => document.querySelector(s);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const MAX_YIELDS = 20000; // pengaman program tanpa henti
-  let levelIndex = 0, ctx = { halt: true }, running = false;
+  const MAX_YIELDS = 20000; // safety limit for endless programs
+  let levelIndex = 0, gridSize = Config.GRID_SIZE, ctx = { halt: true }, running = false;
 
   function loadLevel(i) {
     levelIndex = i; ctx.halt = true; running = false;
-    World.load(i);
-    View.showLevel(Config.LEVELS[i]);
+    World.load(i, gridSize);
+    View.showLevel(Config.LEVELS[i].title, World.state.goal);
     View.message(Config.LEVELS[i].hint);
-    View.showNext(false); View.setRunning(false);
+    View.showNext(false); View.setRunning(false); Editor.setLocked(false);
     View.drawField();
   }
+
+  function reset() { ctx.halt = true; setTimeout(() => loadLevel(levelIndex), 30); } // lets a running loop stop first
 
   async function runProgram() {
     if (running) return;
     const prog = Editor.getProgram();
-    if (!prog.length) return View.message("Programmu masih kosong. Tambahkan blok dulu.", "er");
+    if (!prog) return View.message("Add the \"when 🏁 clicked\" block from Events to start your program.", "er");
+    if (!prog.length) return View.message("Your program is empty. Attach some blocks under the \"when clicked\" block.", "er");
 
     loadLevel(levelIndex);
-    ctx = { halt: false }; running = true;
-    Editor.setLocked(true); View.setRunning(true); View.message("Berjalan...");
+    const mine = (ctx = { halt: false, hl: Editor.highlight }); running = true;
+    Editor.setLocked(true); View.setRunning(true); View.message("Running...");
 
     let count = 0, won = false;
     const delay = () => 620 - +$("#spd").value * 55;
-    for (const step of Interpreter.run(prog, ctx)) {
-      if (++count > MAX_YIELDS) { ctx.halt = true; View.message("Program terlalu panjang atau berputar tanpa henti. Periksa blok “selama”.", "er"); break; }
+    for (const step of Interpreter.run(prog, mine)) {
+      if (++count > MAX_YIELDS) { mine.halt = true; View.message("Program too long or looping forever. Check your while / repeat until blocks.", "er"); break; }
       if (step) { View.drawField(); if (World.isWon()) { won = true; break; } await sleep(delay()); }
-      if (ctx.halt) break;
+      if (mine.halt) break;
     }
+    if (ctx !== mine) return; // a reset / new run took over while we were waiting
     View.drawField();
     won = won || World.isWon();
     running = false; Editor.setLocked(false); View.setRunning(false);
 
-    const goal = Config.LEVELS[levelIndex].goal, got = World.state.score;
+    const { goal, score } = World.state;
     if (won) {
-      ctx.halt = true;
+      mine.halt = true;
       const last = levelIndex === Config.LEVELS.length - 1;
-      View.message(last ? "Selesai! Kamu menamatkan semua level 🏆" : "Hebat! Semua target panen tercapai 🎉", "ok");
+      View.message(last ? "You finished every level! 🏆" : "Great job! All the wheat is harvested 🎉", "ok");
       View.showNext(!last);
-    } else if (!ctx.halt) {
-      View.message("Program selesai, tapi baru " + got + " dari " + goal + " padi yang dipanen. Coba perbaiki blokmu.", "er");
+    } else if (!mine.halt) {
+      View.message("Program finished, but only " + score + " of " + goal + " wheat harvested. Try fixing your blocks.", "er");
     }
   }
 
   $("#run").onclick = runProgram;
-  $("#rst").onclick = () => { ctx.halt = true; setTimeout(() => loadLevel(levelIndex), 30); };
+  $("#rst").onclick = reset;
   $("#nx").onclick = () => loadLevel(levelIndex + 1);
   $("#clr").onclick = () => Editor.clear();
-  $("#ex").onclick = () => { if (running) return; Editor.setProgram(Config.SAMPLES[levelIndex]); View.message("Contoh dimuat. Tekan Jalankan, lalu coba ubah sendiri."); };
+  $("#ex").onclick = () => { if (running) return; Editor.setProgram(Config.SAMPLES[levelIndex]); View.message("Example loaded. Press Run, then try changing it yourself."); };
 
-  Editor.init("#root", "#pal");
+  Editor.init("#blockly");
   loadLevel(0);
 })();

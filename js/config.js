@@ -1,101 +1,178 @@
-/* config.js — SEMUA DATA ada di sini: arah, kondisi, definisi blok, level, contoh.
-   Menambah level / blok baru cukup mengubah file ini (+ handler di interpreter.js). */
+/* config.js — game data: directions, conditions, levels, examples.
+   Adding a level = add one object to RAW_LEVELS. (Block definitions now live in editor.js, built with Blockly.) */
 window.Petani = window.Petani || {};
 
 Petani.Config = (function () {
-  const GROW = 2; // langkah yang dibutuhkan padi muda untuk matang
+  // ===== GRID SIZE (ubah di sini) =====
+  // Ukuran ladang yang dipakai gim. Setiap level harus punya map untuk ukuran ini di `maps` (lihat RAW_LEVELS).
+  // Bawaan tersedia: 3, 6, 9. Untuk ukuran lain (mis. 5), tambahkan  5: [...]  di maps tiap level.
+  const GRID_SIZE = 6;
 
-  const DIR_VEC = { atas: [0, -1], bawah: [0, 1], kiri: [-1, 0], kanan: [1, 0] };
-  const DIR_LABEL = { atas: "↑ atas", bawah: "↓ bawah", kiri: "← kiri", kanan: "→ kanan" };
-  const ARROW = { atas: "↑", bawah: "↓", kiri: "←", kanan: "→" };
+  const DIR_VEC = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  const ARROW = { up: "↑", down: "↓", left: "←", right: "→" };
+  const DIR_LABEL = {};
+  for (const d in DIR_VEC) DIR_LABEL[d] = ARROW[d] + " " + d;
 
-  // Kondisi untuk blok "jika" dan "selama": kunci -> teks di dropdown
-  const COND_LABEL = { matang: "padi matang", muda: "padi muda", kosong: "tanah kosong" };
-  for (const d in DIR_VEC) COND_LABEL[d] = "bisa ke " + ARROW[d];
-  for (const d in DIR_VEC) COND_LABEL["no_" + d] = "tidak bisa ke " + ARROW[d];
+  // Conditions for if / while / repeat until: key -> dropdown text
+  const COND_LABEL = { wheat: "wheat here", nowheat: "no wheat here", any: "wheat remains" };
+  for (const d in DIR_VEC) COND_LABEL["can_" + d] = "can move " + ARROW[d];
+  for (const d in DIR_VEC) COND_LABEL["no_" + d] = "blocked " + ARROW[d];
+  for (const d in DIR_VEC) COND_LABEL["wheat_" + d] = "wheat on " + ARROW[d];
 
-  // Definisi blok. kind = warna (mv/ac/ct), container = punya isi di dalamnya,
-  // value = kontrol bawaan blok (select atau number).
-  const BLOCKS = {
-    jalan:  { label: "jalan ke", kind: "mv", value: { type: "select", options: DIR_LABEL, def: "kanan" } },
-    tanam:  { label: "tanam padi 🌱", kind: "ac" },
-    panen:  { label: "panen padi 🌾", kind: "ac" },
-    tunggu: { label: "tunggu ⏳", kind: "ac" },
-    ulang:  { label: "ulangi", kind: "ct", container: true, suffix: "kali", value: { type: "number", min: 1, max: 99, def: 3 } },
-    jika:   { label: "jika", kind: "ct", container: true, suffix: "maka", value: { type: "select", options: COND_LABEL, def: "matang" } },
-    selama: { label: "selama", kind: "ct", container: true, value: { type: "select", options: COND_LABEL, def: "kanan" } }
-  };
+  // ===== LEVELS =====
+  //   title  : level title            hint  : shown when the level starts
+  //   maps   : { 3: [...], 6: [...], 9: [...] }  one array of strings per grid size, 1 string = 1 row (top row first)
+  //            legend: "." soil | "W" wheat | "#" rock (the farmer cannot step on rocks)
+  //   start  : (optional) farmer start [column, row], default [0, 0]
+  //   sample : (optional) example solution for the "Show example" button (tree of {t, v, body, orelse})
+  //   Goal = number of "W" tiles in the map (harvest everything).
+  const TILE = { ".": "soil", "W": "wheat", "#": "rock" };
 
-  // ===== LEVEL =====
-  // Tiap level = satu objek di array LEVELS. Tambah / ubah / hapus / urutkan level cukup di sini.
-  //   title  : judul level
-  //   hint   : petunjuk yang tampil di awal level
-  //   map    : array teks, 1 string = 1 baris ladang (baris pertama = paling atas). Harus persegi (N baris x N kolom).
-  //            Legenda: "." tanah kosong | "m" padi muda | "P" padi matang
-  //   goal   : (opsional) target jumlah panen. Bawaan = jumlah petak yang berisi padi pada map
-  //   start  : (opsional) posisi awal petani [kolom, baris], dihitung dari 0. Bawaan [0, 0]
-  //   sample : (opsional) contoh solusi untuk tombol "Lihat contoh" (pohon blok: {t, v, body})
-  const TILE = { ".": 0, "m": 1, "P": 2 }; // 0=kosong, 1=muda, 2=matang (sama dengan World.EMPTY/YOUNG/RIPE)
-
-  // Pola ular: menyusuri semua petak baris demi baris, lakukan `act` di tiap petak
-  const snake = (act, vert) => [
-    { t: "ulang", v: 2, body: [
-      { t: "selama", v: "kanan", body: [{ t: act }, { t: "jalan", v: "kanan" }] }, { t: act }, { t: "jalan", v: vert },
-      { t: "selama", v: "kiri", body: [{ t: act }, { t: "jalan", v: "kiri" }] }, { t: act }, { t: "jalan", v: vert } ] }
+  // Example-solution helpers
+  const H = { t: "harvest" }, go = (d) => ({ t: "move", v: d });
+  const scan = (act) => [ // row-by-row sweep that runs `act` on every tile; works for any size
+    { t: "while", v: "can_down", body: [
+      { t: "while", v: "can_right", body: [...act, go("right")] }, ...act,
+      { t: "while", v: "can_left", body: [go("left")] }, go("down") ] },
+    { t: "while", v: "can_right", body: [...act, go("right")] }, ...act
   ];
 
   const RAW_LEVELS = [
-    { title: "Level 1: Baris pertama",
-      hint: "Ada 5 padi matang di baris atas. Panen semuanya!",
-      map: ["PPPPP",
-            ".....",
-            ".....",
-            ".....",
-            "....."],
-      goal: 5,
-      sample: [{ t: "panen" }, { t: "ulang", v: 4, body: [{ t: "jalan", v: "kanan" }, { t: "panen" }] }] },
+    { title: "Level 1: First row",
+      hint: "The top row is full of wheat. Harvest all of it! Hint: while can move →",
+      maps: {
+        3: ["WWW",
+            "...",
+            "..."],
+        6: ["WWWWWW",
+            "......",
+            "......",
+            "......",
+            "......",
+            "......"],
+        9: ["WWWWWWWWW",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            "........."] },
+      sample: [H, { t: "while", v: "can_right", body: [go("right"), H] }] },
 
-    { title: "Level 2: Ladang penuh",
-      hint: "Seluruh ladang sudah matang. Coba pakai blok “ulangi” atau “selama”.",
-      map: ["PPPP",
-            "PPPP",
-            "PPPP",
-            "PPPP"],
-      goal: 16,
-      sample: snake("panen", "bawah") },
+    { title: "Level 2: Full field",
+      hint: "Every tile has wheat. Try a loop inside a loop.",
+      maps: {
+        3: ["WWW",
+            "WWW",
+            "WWW"],
+        6: ["WWWWWW",
+            "WWWWWW",
+            "WWWWWW",
+            "WWWWWW",
+            "WWWWWW",
+            "WWWWWW"],
+        9: ["WWWWWWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW"] },
+      sample: scan([H]) },
 
-    { title: "Level 3: Mulai dari nol",
-      hint: "Tanah masih kosong. Tanam dulu, tunggu 2 langkah sampai tumbuh, lalu panen.",
-      map: ["....",
-            "....",
-            "....",
-            "...."],
-      goal: 16,
-      sample: snake("tanam", "bawah").concat(snake("panen", "atas")) },
+    { title: "Level 3: Rock staircase",
+      hint: "Rocks (#) block the way, so \"can move\" is false next to them. Use that to find the end of each row.",
+      maps: {
+        3: ["WWW",
+            "WW#",
+            "W##"],
+        6: ["WWWWWW",
+            "WWWWW#",
+            "WWWW##",
+            "WWW###",
+            "WW####",
+            "W#####"],
+        9: ["WWWWWWWWW",
+            "WWWWWWWW#",
+            "WWWWWWW##",
+            "WWWWWW###",
+            "WWWWW####",
+            "WWWW#####",
+            "WWW######",
+            "WW#######",
+            "W########"] },
+      sample: scan([H]) },
 
-    { title: "Level 4: Papan catur",
-      hint: "Padi matang hanya ada di sebagian petak. Panen semuanya, petak kosong dilewati saja.",
-      map: ["P.P.",
-            ".P.P",
-            "P.P.",
-            ".P.P"],
-      sample: snake("panen", "bawah") }
+    { title: "Level 4: Checkerboard",
+      hint: "Only some tiles have wheat. Use \"if wheat here\" so you only harvest where there is something.",
+      maps: {
+        3: ["W.W",
+            ".W.",
+            "W.W"],
+        6: ["W.W.W.",
+            ".W.W.W",
+            "W.W.W.",
+            ".W.W.W",
+            "W.W.W.",
+            ".W.W.W"],
+        9: ["W.W.W.W.W",
+            ".W.W.W.W.",
+            "W.W.W.W.W",
+            ".W.W.W.W.",
+            "W.W.W.W.W",
+            ".W.W.W.W.",
+            "W.W.W.W.W",
+            ".W.W.W.W.",
+            "W.W.W.W.W"] },
+      sample: scan([{ t: "if", v: "wheat", body: [H] }]) },
+
+    { title: "Level 5: Zigzag path",
+      hint: "Follow the wheat path through the rocks. Try \"while wheat remains\" with an if / else.",
+      maps: {
+        3: ["WW#",
+            ".WW",
+            "..W"],
+        6: ["WW####",
+            ".WW###",
+            "..WW##",
+            "...WW#",
+            "....WW",
+            ".....W"],
+        9: ["WW#######",
+            ".WW######",
+            "..WW#####",
+            "...WW####",
+            "....WW###",
+            ".....WW##",
+            "......WW#",
+            ".......WW",
+            "........W"] },
+      sample: [H, { t: "while", v: "any", body: [
+        { t: "ifelse", v: "wheat_right", body: [go("right")], orelse: [go("down")] }, H ] }] }
   ];
 
-  // Validasi + isi nilai bawaan, supaya salah ketik di map langsung ketahuan
+  // Validate + fill defaults, so typos in a map are caught immediately
   const LEVELS = RAW_LEVELS.map((lv, i) => {
-    const name = "Level " + (i + 1), n = lv.map.length;
-    lv.map.forEach((row, y) => {
-      if (row.length !== n) throw new Error(name + ": map harus persegi (" + n + " baris x " + n + " kolom), baris " + (y + 1) + " panjangnya " + row.length);
-      for (const ch of row) if (!(ch in TILE)) throw new Error(name + ': karakter "' + ch + '" tidak dikenal di map (pakai . m P)');
+    const name = "Level " + (i + 1), out = Object.assign({ start: [0, 0], sample: [] }, lv);
+    if (!lv.maps[GRID_SIZE]) throw new Error(name + ": no " + GRID_SIZE + "x" + GRID_SIZE + " map in `maps` (GRID_SIZE = " + GRID_SIZE + ")");
+    Object.keys(lv.maps).map(Number).forEach((n) => { // every map that exists must be valid
+      const m = lv.maps[n];
+      if (!m || m.length !== n) throw new Error(name + ": missing " + n + "x" + n + " map (needs " + n + " rows)");
+      m.forEach((row, y) => {
+        if (row.length !== n) throw new Error(name + " (" + n + "x" + n + "): row " + (y + 1) + " has " + row.length + " columns, expected " + n);
+        for (const ch of row) if (!(ch in TILE)) throw new Error(name + ': unknown map character "' + ch + '" (use . W #)');
+      });
+      const [sx, sy] = out.start;
+      if (m[sy] === undefined || m[sy][sx] === undefined || m[sy][sx] === "#") throw new Error(name + " (" + n + "x" + n + "): invalid start tile");
     });
-    const out = Object.assign({ size: n, goal: lv.map.join("").replace(/\./g, "").length, start: [0, 0], sample: [] }, lv);
-    if (out.start[0] < 0 || out.start[1] < 0 || out.start[0] >= n || out.start[1] >= n) throw new Error(name + ": start di luar ladang");
     return out;
   });
 
-  // Contoh solusi per level (diambil dari properti `sample` tiap level)
   const SAMPLES = LEVELS.map((lv) => lv.sample);
 
-  return { GROW, DIR_VEC, DIR_LABEL, COND_LABEL, BLOCKS, TILE, LEVELS, SAMPLES };
+  return { GRID_SIZE, DIR_VEC, DIR_LABEL, COND_LABEL, TILE, LEVELS, SAMPLES };
 })();

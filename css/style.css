@@ -1,49 +1,61 @@
-/* ===== Tema (ubah warna di sini) ===== */
-:root{box-sizing:border-box;
---bg:#e6efd9;--pn:#fbfdf6;--tx:#1f2a1c;--mu:#5d6b57;--bd:#c5d3b6;--soil:#b5834f;--soil2:#9a6c3d;--ws:#f2f7ea;
---sky1:#bfe3ff;--sky2:#e3f2d3;--mv:#4c97ff;--ac:#3fae4a;--ct:#f0a000;--btn:#2f7d32;--btnt:#fff}
-@media (prefers-color-scheme:dark){:root{--bg:#172016;--pn:#1f2c1e;--tx:#e8f1e0;--mu:#9db293;--bd:#344a32;--soil:#8a6238;--soil2:#6f4d2b;--ws:#182517;--btn:#5fc263;--btnt:#10200f;--sky1:#1b3045;--sky2:#1c2c1a}}
+/* ===== Tema Scratch (ubah warna di sini) ===== */
+:root{--menu:#855cd6;--bg:#e5f0ff;--pn:#fff;--bd:#d9e3f2;--tx:#575e75;--mu:#7c87a5;--btn:#ffab19;--ok:#2f8a3a;--er:#d6452f;
+--soil:#b5834f;--sky1:#bfe3ff;--sky2:#e3f2d3;--ws:#f9f9f9;--ws-bd:#c9c9c9}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font:500 16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:600 15px/1.4 "Helvetica Neue",Helvetica,Arial,sans-serif;display:flex;flex-direction:column}
+
+/* ===== Menu bar (ungu seperti Scratch) ===== */
+.menubar{display:flex;align-items:center;gap:16px;height:48px;padding:0 16px;background:var(--menu);color:#fff;flex:none}
+.menubar h1{margin:0;font-size:1.15rem}
+.menu-lv{flex:1;opacity:.92;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ===== Layout ===== */
-header{padding:14px 18px 4px}
-h1{margin:0;font-size:1.6rem}
-header p{margin:2px 0 0;color:var(--mu)}
-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;padding:12px 18px 24px;max-width:1200px;margin:0 auto}
-@media (max-width:820px){main{grid-template-columns:1fr}.game{order:-1}}
-.panel{background:var(--pn);border:2px solid var(--bd);border-radius:14px;padding:12px}
-h2{margin:0 0 8px;font-size:1.05rem}
-.note{color:var(--mu);font-size:.85rem;margin:8px 0 0}
+.app{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,480px);gap:8px;padding:8px}
+.code-pane,.stage-pane{min-height:0;display:flex;flex-direction:column}
+.code-pane{background:var(--pn);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.tabs{display:flex;background:var(--bg);border-bottom:1px solid var(--bd);padding:4px 6px 0;flex:none}
+.tab{display:inline-flex;align-items:center;gap:6px;padding:7px 18px;background:var(--pn);border:1px solid var(--bd);border-bottom:0;border-radius:6px 6px 0 0;color:#4c97ff;font-size:.9rem;box-shadow:inset 0 3px 0 #4c97ff}
+.ic{font-style:normal;font-size:.8rem}
+.blockly-host{position:relative;flex:1;min-height:360px}
+.ws-lock{position:absolute;inset:0;z-index:20;background:rgba(255,255,255,.35);cursor:not-allowed}
+.ws-lock[hidden]{display:none}
+@media (max-width:860px){body{height:auto}.app{grid-template-columns:1fr}.stage-pane{order:-1}.blockly-host{height:62vh}}
 
-/* ===== Blok & editor ===== */
-.pal{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-.blk{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:#fff;border-radius:8px;padding:6px 10px;font-weight:700;font-size:.95rem;user-select:none}
-.blk.mv{background:var(--mv)}.blk.ac{background:var(--ac)}.blk.ct{background:var(--ct);color:#2a1d00;flex-direction:column;align-items:stretch}
-.pal .blk{cursor:grab;box-shadow:0 2px 0 rgba(0,0,0,.22)}
-.ws{background:var(--ws);border:2px dashed var(--bd);border-radius:10px;padding:8px;min-height:240px}
-.slot{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-height:34px;padding:5px;border-radius:8px;border:2px dashed transparent}
-.slot.root{min-height:220px}
-.slot:empty::before{content:"letakkan blok di sini";color:var(--mu);font-size:.85rem;font-weight:500}
-.slot.act{border-color:var(--ct)}
-.slot.over{background:rgba(76,151,255,.18)}
-.blk.ct>.slot{background:rgba(0,0,0,.12);margin-left:10px;border-left:4px solid rgba(0,0,0,.25)}
-.row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-select,input[type=number]{font:inherit;font-size:.9rem;border-radius:6px;border:0;padding:1px 4px;background:#fff;color:#1f2a1c}
-input[type=number]{width:52px}
-.x{margin-left:auto;background:rgba(0,0,0,.25);color:#fff;border:0;border-radius:50%;width:22px;height:22px;cursor:pointer;font:inherit;font-weight:700;line-height:1}
-
-/* ===== Tombol ===== */
-.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
-.bar.center{justify-content:center}
-button.b{font:inherit;font-weight:700;border:0;border-radius:10px;padding:8px 14px;cursor:pointer;background:var(--btn);color:var(--btnt)}
-button.b.g{background:transparent;color:var(--tx);border:2px solid var(--bd)}
-button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #ffb300;outline-offset:2px}
-label.sp{display:flex;align-items:center;gap:6px;color:var(--mu);font-size:.9rem}
-
-/* ===== Ladang 3D ===== */
-.field{width:100%;max-width:560px;aspect-ratio:4/3;margin:0 auto;border-radius:12px;overflow:hidden;border:2px solid var(--bd);background:linear-gradient(var(--sky1),var(--sky2));color:var(--mu);font-size:.9rem}
+/* ===== Stage (kanan) ===== */
+.stage-pane{gap:6px;min-width:0}
+.stage-bar{display:flex;align-items:center;gap:6px;background:var(--pn);border:1px solid var(--bd);border-radius:8px;padding:5px 8px}
+button.icon{width:38px;height:38px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;cursor:pointer}
+button.icon:hover{background:var(--bg)}
+button.icon:disabled{opacity:.45;cursor:default;background:transparent}
+.stat{margin-left:auto;display:flex;gap:10px;align-items:center;font-size:.9rem;color:var(--mu)}
+.stat b{color:var(--tx);background:var(--bg);border-radius:12px;padding:2px 10px}
+.field{width:100%;aspect-ratio:4/3;border-radius:8px;overflow:hidden;border:1px solid var(--bd);background:linear-gradient(var(--sky1),var(--sky2));color:var(--mu);font-size:.9rem}
 .field canvas{cursor:grab}.field canvas:active{cursor:grabbing}
-.stat{display:flex;justify-content:space-between;gap:8px;margin:8px auto 0;max-width:560px;font-weight:700}
-.msg{min-height:2.6em;margin:8px auto 0;max-width:560px;color:var(--mu)}
-.msg.ok{color:var(--btn)}.msg.er{color:#d6452f}
+.hint3d{margin:0;text-align:center;font-size:.8rem;color:var(--mu)}
+
+/* ===== Kartu level (seperti sprite pane) ===== */
+.card{background:var(--pn);border:1px solid var(--bd);border-radius:8px;padding:10px 12px}
+.msg{min-height:2.6em;color:var(--tx)}
+.msg.ok{color:var(--ok)}.msg.er{color:var(--er)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+button.b{font:inherit;font-weight:700;font-size:.85rem;border:0;border-radius:18px;padding:7px 14px;cursor:pointer;background:var(--btn);color:#fff}
+button.b.g{background:#fff;color:#855cd6;border:2px solid #d9c8f7}
+button.b.nx{background:#ffbf00;color:#4d3a00}
+button.b[hidden]{display:none}
+label.sp{display:flex;align-items:center;gap:6px;color:var(--mu);font-size:.85rem}
+select{font:inherit;font-size:.85rem;border-radius:6px;border:1px solid var(--bd);padding:2px 4px;color:var(--tx);background:#fff}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #ffb300;outline-offset:2px}
+
+/* ===== Blockly: toolbox kategori ala Scratch ===== */
+.blocklyToolbox{background:#fff!important;border-right:1px solid var(--ws-bd);width:68px;padding:4px 0}
+.blocklyToolboxCategoryGroup{display:block}
+.blocklyToolboxCategory{height:auto!important;margin:0!important;padding:7px 0 5px!important;border:0!important;display:flex;flex-direction:column;align-items:center;line-height:1;cursor:pointer}
+.blocklyToolboxCategory::before{content:"";width:32px;height:32px;border-radius:50%;background:var(--cat,#999);box-shadow:inset 0 0 0 2px rgba(0,0,0,.12);margin-bottom:4px}
+.blocklyTreeRowContentContainer{display:flex;flex-direction:column;align-items:center}
+.blocklyToolboxCategoryIcon{display:none!important}
+.blocklyToolboxCategoryLabel{font:700 10.5px "Helvetica Neue",Helvetica,Arial,sans-serif!important;color:#575e75;padding:0!important}
+.blocklyToolboxSelected{background:#e9eef2}
+.blocklyToolboxSelected .blocklyToolboxCategoryLabel{color:#575e75!important}
+.blocklyToolboxCategory:not(.blocklyToolboxSelected):hover{background:#f2f5f9!important}
+.blocklyFlyoutBackground{fill:#f9f9f9;fill-opacity:1}

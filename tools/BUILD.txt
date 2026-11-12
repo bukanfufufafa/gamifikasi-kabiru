@@ -1,0 +1,7 @@
+lib/blockly.min.js dibuat dari folder blockly-main (Blockly 13.4.0) tanpa mengubah kodenya:
+  1) cd blockly-main/packages/blockly
+     tsc -p tsconfig.json --outDir _build --declaration false --declarationMap false --sourceMap false --incremental false
+  2) letakkan folder blockly-main sejajar dengan petani-blok, lalu dari folder tools/:
+     esbuild entry.js --bundle --minify --format=iife --target=es2020 --legal-comments=none --outfile=../lib/blockly.min.js
+  3) salin blockly-main/packages/blockly/media ke lib/media
+Game hanya perlu lib/ yang sudah jadi; langkah ini hanya jika ingin upgrade Blockly.
