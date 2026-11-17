@@ -40,6 +40,8 @@ Petani.Config = (function () {
   const RAW_LEVELS = [
     { title: "Level 1: First row",
       hint: "The top row is full of wheat. Harvest all of it! Hint: while can move →",
+      minBlocks: 6,
+      starThresholds: [6, 8, 10, 13],
       maps: {
         3: ["WWW",
             "...",
@@ -63,6 +65,8 @@ Petani.Config = (function () {
 
     { title: "Level 2: Full field",
       hint: "Every tile has wheat. Try a loop inside a loop.",
+      minBlocks: 9,
+      starThresholds: [9, 13, 17, 24],
       maps: {
         3: ["WWW",
             "WWW",
@@ -86,6 +90,8 @@ Petani.Config = (function () {
 
     { title: "Level 3: Rock staircase",
       hint: "Rocks (#) block the way, so \"can move\" is false next to them. Use that to find the end of each row.",
+      minBlocks: 11,
+      starThresholds: [11, 14, 18, 24],
       maps: {
         3: ["WWW",
             "WW#",
@@ -109,6 +115,8 @@ Petani.Config = (function () {
 
     { title: "Level 4: Checkerboard",
       hint: "Only some tiles have wheat. Use \"if wheat here\" so you only harvest where there is something.",
+      minBlocks: 13,
+      starThresholds: [13, 17, 22, 28],
       maps: {
         3: ["W.W",
             ".W.",
@@ -132,6 +140,8 @@ Petani.Config = (function () {
 
     { title: "Level 5: Zigzag path",
       hint: "Follow the wheat path through the rocks. Try \"while wheat remains\" with an if / else.",
+      minBlocks: 9,
+      starThresholds: [9, 12, 15, 20],
       maps: {
         3: ["WW#",
             ".WW",

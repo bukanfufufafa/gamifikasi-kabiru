@@ -173,6 +173,19 @@ Petani.Editor = (function () {
   }
 
   // ===== Public API =====
+  const changeListeners = [];
+
+  function getBlockCount() {
+    if (!ws) return 0;
+    const hats = ws.getBlocksByType("petani_start", true);
+    if (!hats.length) return ws.getAllBlocks(false).length;
+    return hats[0].getDescendants(false).length;
+  }
+
+  function onChange(cb) {
+    changeListeners.push(cb);
+  }
+
   function init(hostSel) {
     const host = document.querySelector(hostSel);
     Blockly.common.defineBlocksWithJsonArray(BLOCK_DEFS);
@@ -186,13 +199,30 @@ Petani.Editor = (function () {
     // Overlay that blocks editing while the program runs
     lockEl = document.createElement("div"); lockEl.className = "ws-lock"; lockEl.hidden = true; host.append(lockEl);
     new ResizeObserver(() => Blockly.svgResize(ws)).observe(host);
+
+    ws.addChangeListener((e) => {
+      if (e && e.isUiEvent) return;
+      const count = getBlockCount();
+      for (const cb of changeListeners) cb(count);
+    });
+
     load([]);
   }
 
   return {
-    init, getProgram,
-    setProgram: (tree) => load(tree),
-    clear() { if (!locked) load([]); },
+    init, getProgram, getBlockCount, onChange,
+    setProgram: (tree) => {
+      load(tree);
+      const count = getBlockCount();
+      for (const cb of changeListeners) cb(count);
+    },
+    clear() {
+      if (!locked) {
+        load([]);
+        const count = getBlockCount();
+        for (const cb of changeListeners) cb(count);
+      }
+    },
     setLocked(v) { locked = v; lockEl.hidden = !v; if (!v) ws.highlightBlock(null); },
     highlight(id) { ws.highlightBlock(id); },
     resize() { Blockly.svgResize(ws); }
