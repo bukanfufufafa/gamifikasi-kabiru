@@ -8,7 +8,7 @@ Petani.Editor = (function () {
   let ws = null, lockEl = null, locked = false;
 
   // ===== Block definitions (colors come from the theme styles below) =====
-  const DIRS = [["↑ up", "up"], ["↓ down", "down"], ["← left", "left"], ["→ right", "right"]];
+  const DIRS = [["↑ atas", "up"], ["↓ bawah", "down"], ["← kiri", "left"], ["→ kanan", "right"]];
   const dirField = { type: "field_dropdown", name: "DIR", options: DIRS };
   const flag = "data:image/svg+xml;utf8," + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">' +
@@ -16,36 +16,36 @@ Petani.Editor = (function () {
     '<path d="M5.6 4.6c3.6-2 6.2 1.8 12.4-.4v9c-6.2 2.2-8.8-1.6-12.4.4z" fill="#4cbf56" stroke="#2f8a3a" stroke-width="1.4" stroke-linejoin="round"/></svg>');
 
   const BLOCK_DEFS = [
-    { type: "petani_start", style: "event_blocks", tooltip: "The program starts here when you press the green flag.",
-      message0: "when %1 clicked", args0: [{ type: "field_image", src: flag, width: 22, height: 22, alt: "flag" }], nextStatement: null },
+    { type: "petani_start", style: "event_blocks", tooltip: "Program dimulai dari sini saat bendera hijau ditekan.",
+      message0: "ketika %1 diklik", args0: [{ type: "field_image", src: flag, width: 22, height: 22, alt: "flag" }], nextStatement: null },
 
-    { type: "petani_move", style: "motion_blocks", tooltip: "Move the farmer one tile.",
-      message0: "move %1", args0: [dirField], previousStatement: null, nextStatement: null },
-    { type: "petani_harvest", style: "action_blocks", tooltip: "Harvest the wheat on this tile.",
-      message0: "harvest 🌾", previousStatement: null, nextStatement: null },
+    { type: "petani_move", style: "motion_blocks", tooltip: "Gerakkan petani satu petak.",
+      message0: "gerak %1", args0: [dirField], previousStatement: null, nextStatement: null },
+    { type: "petani_harvest", style: "action_blocks", tooltip: "Panen gandum di petak ini.",
+      message0: "panen 🌾", previousStatement: null, nextStatement: null },
 
-    { type: "petani_repeat", style: "control_blocks", tooltip: "Repeat the blocks inside a number of times.",
-      message0: "repeat %1 times", args0: [{ type: "field_number", name: "TIMES", value: 3, min: 1, max: 99, precision: 1 }],
+    { type: "petani_repeat", style: "control_blocks", tooltip: "Ulangi blok di dalamnya beberapa kali.",
+      message0: "ulangi %1 kali", args0: [{ type: "field_number", name: "TIMES", value: 3, min: 1, max: 99, precision: 1 }],
       message1: "%1", args1: [{ type: "input_statement", name: "DO" }], previousStatement: null, nextStatement: null },
-    { type: "petani_while", style: "control_blocks", tooltip: "Repeat while the condition is true.", inputsInline: true,
-      message0: "while %1", args0: [{ type: "input_value", name: "COND", check: "Boolean" }],
+    { type: "petani_while", style: "control_blocks", tooltip: "Ulangi selama kondisi benar.", inputsInline: true,
+      message0: "selama %1", args0: [{ type: "input_value", name: "COND", check: "Boolean" }],
       message1: "%1", args1: [{ type: "input_statement", name: "DO" }], previousStatement: null, nextStatement: null },
-    { type: "petani_until", style: "control_blocks", tooltip: "Repeat until the condition becomes true.", inputsInline: true,
-      message0: "repeat until %1", args0: [{ type: "input_value", name: "COND", check: "Boolean" }],
+    { type: "petani_until", style: "control_blocks", tooltip: "Ulangi sampai kondisi menjadi benar.", inputsInline: true,
+      message0: "ulangi sampai %1", args0: [{ type: "input_value", name: "COND", check: "Boolean" }],
       message1: "%1", args1: [{ type: "input_statement", name: "DO" }], previousStatement: null, nextStatement: null },
-    { type: "petani_if", style: "control_blocks", tooltip: "Run the blocks inside only if the condition is true.", inputsInline: true,
-      message0: "if %1 then", args0: [{ type: "input_value", name: "COND", check: "Boolean" }],
+    { type: "petani_if", style: "control_blocks", tooltip: "Jalankan blok di dalamnya hanya jika kondisi benar.", inputsInline: true,
+      message0: "jika %1 maka", args0: [{ type: "input_value", name: "COND", check: "Boolean" }],
       message1: "%1", args1: [{ type: "input_statement", name: "DO" }], previousStatement: null, nextStatement: null },
-    { type: "petani_ifelse", style: "control_blocks", tooltip: "Run the first blocks if true, otherwise the else blocks.", inputsInline: true,
-      message0: "if %1 then", args0: [{ type: "input_value", name: "COND", check: "Boolean" }],
+    { type: "petani_ifelse", style: "control_blocks", tooltip: "Jalankan blok pertama jika benar, jika tidak jalankan blok \"selain itu\".", inputsInline: true,
+      message0: "jika %1 maka", args0: [{ type: "input_value", name: "COND", check: "Boolean" }],
       message1: "%1", args1: [{ type: "input_statement", name: "DO" }],
-      message2: "else", message3: "%1", args3: [{ type: "input_statement", name: "ELSE" }], previousStatement: null, nextStatement: null },
+      message2: "selain itu", message3: "%1", args3: [{ type: "input_statement", name: "ELSE" }], previousStatement: null, nextStatement: null },
 
-    { type: "petani_wheat_here", style: "sensing_blocks", message0: "wheat here?", output: "Boolean", tooltip: "True if the farmer stands on wheat." },
-    { type: "petani_wheat_any", style: "sensing_blocks", message0: "wheat remains?", output: "Boolean", tooltip: "True while there is still wheat somewhere in the field." },
-    { type: "petani_can_move", style: "sensing_blocks", message0: "can move %1 ?", args0: [dirField], output: "Boolean", tooltip: "True if the farmer can step that way (no rock, no edge)." },
-    { type: "petani_blocked", style: "sensing_blocks", message0: "blocked %1 ?", args0: [dirField], output: "Boolean", tooltip: "True if a rock or the edge is in that direction." },
-    { type: "petani_wheat_dir", style: "sensing_blocks", message0: "wheat on %1 ?", args0: [dirField], output: "Boolean", tooltip: "True if the next tile in that direction has wheat." }
+    { type: "petani_wheat_here", style: "sensing_blocks", message0: "ada gandum di sini?", output: "Boolean", tooltip: "Benar jika petani berdiri di atas gandum." },
+    { type: "petani_wheat_any", style: "sensing_blocks", message0: "masih ada gandum?", output: "Boolean", tooltip: "Benar selama masih ada gandum di ladang." },
+    { type: "petani_can_move", style: "sensing_blocks", message0: "bisa gerak %1 ?", args0: [dirField], output: "Boolean", tooltip: "Benar jika petani bisa melangkah ke arah itu (tanpa batu atau tepi)." },
+    { type: "petani_blocked", style: "sensing_blocks", message0: "terhalang %1 ?", args0: [dirField], output: "Boolean", tooltip: "Benar jika ada batu atau tepi ladang di arah itu." },
+    { type: "petani_wheat_dir", style: "sensing_blocks", message0: "ada gandum di %1 ?", args0: [dirField], output: "Boolean", tooltip: "Benar jika petak berikutnya di arah itu berisi gandum." }
   ];
 
   // ===== Toolbox (Scratch categories) =====
@@ -53,16 +53,16 @@ Petani.Editor = (function () {
   const TOOLBOX = {
     kind: "categoryToolbox",
     contents: [
-      { kind: "category", name: "Events", categorystyle: "event_category", contents: [blk("petani_start")] },
-      { kind: "category", name: "Motion", categorystyle: "motion_category",
+      { kind: "category", name: "Kejadian", categorystyle: "event_category", contents: [blk("petani_start")] },
+      { kind: "category", name: "Gerak", categorystyle: "motion_category",
         contents: ["right", "left", "up", "down"].map((d) => blk("petani_move", { DIR: d })) },
-      { kind: "category", name: "Actions", categorystyle: "action_category", contents: [blk("petani_harvest")] },
-      { kind: "category", name: "Control", categorystyle: "control_category",
+      { kind: "category", name: "Aksi", categorystyle: "action_category", contents: [blk("petani_harvest")] },
+      { kind: "category", name: "Kontrol", categorystyle: "control_category",
         contents: [blk("petani_repeat"), blk("petani_while"), blk("petani_until"), blk("petani_if"), blk("petani_ifelse")] },
-      { kind: "category", name: "Sensing", categorystyle: "sensing_category",
+      { kind: "category", name: "Sensor", categorystyle: "sensing_category",
         contents: [blk("petani_wheat_here"), blk("petani_wheat_any"), blk("petani_can_move", { DIR: "right" }),
                    blk("petani_blocked", { DIR: "right" }), blk("petani_wheat_dir", { DIR: "right" })] },
-      { kind: "category", name: "Operators", categorystyle: "logic_category",
+      { kind: "category", name: "Operator", categorystyle: "logic_category",
         contents: [blk("logic_operation", { OP: "AND" }), blk("logic_operation", { OP: "OR" }), blk("logic_negate")] }
     ]
   };
@@ -187,6 +187,16 @@ Petani.Editor = (function () {
   }
 
   function init(hostSel) {
+    Object.assign(Blockly.Msg, {
+      LOGIC_OPERATION_AND: "dan", LOGIC_OPERATION_OR: "atau", LOGIC_NEGATE_TITLE: "bukan %1",
+      LOGIC_OPERATION_TOOLTIP_AND: "Benar jika kedua kondisi benar.", LOGIC_OPERATION_TOOLTIP_OR: "Benar jika salah satu kondisi benar.",
+      LOGIC_NEGATE_TOOLTIP: "Membalik kondisi: benar menjadi salah, salah menjadi benar.",
+      DELETE_BLOCK: "Hapus Blok", DELETE_X_BLOCKS: "Hapus %1 Blok", DUPLICATE_BLOCK: "Gandakan",
+      ADD_COMMENT: "Tambah Komentar", REMOVE_COMMENT: "Hapus Komentar", COLLAPSE_BLOCK: "Ciutkan Blok", EXPAND_BLOCK: "Bentangkan Blok",
+      DISABLE_BLOCK: "Nonaktifkan Blok", ENABLE_BLOCK: "Aktifkan Blok", CLEAN_UP: "Rapikan Blok", UNDO: "Urungkan", REDO: "Ulangi",
+      DELETE_ALL_BLOCKS: "Hapus semua %1 blok?", COLLAPSE_ALL: "Ciutkan Semua Blok", EXPAND_ALL: "Bentangkan Semua Blok",
+      HELP: "Bantuan"
+    });
     const host = document.querySelector(hostSel);
     Blockly.common.defineBlocksWithJsonArray(BLOCK_DEFS);
     registerCategory();

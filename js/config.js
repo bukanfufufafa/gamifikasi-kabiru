@@ -10,14 +10,15 @@ Petani.Config = (function () {
 
   const DIR_VEC = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
   const ARROW = { up: "↑", down: "↓", left: "←", right: "→" };
+  const ID_DIR = { up: "atas", down: "bawah", left: "kiri", right: "kanan" };
   const DIR_LABEL = {};
-  for (const d in DIR_VEC) DIR_LABEL[d] = ARROW[d] + " " + d;
+  for (const d in DIR_VEC) DIR_LABEL[d] = ARROW[d] + " " + ID_DIR[d];
 
   // Conditions for if / while / repeat until: key -> dropdown text
-  const COND_LABEL = { wheat: "wheat here", nowheat: "no wheat here", any: "wheat remains" };
-  for (const d in DIR_VEC) COND_LABEL["can_" + d] = "can move " + ARROW[d];
-  for (const d in DIR_VEC) COND_LABEL["no_" + d] = "blocked " + ARROW[d];
-  for (const d in DIR_VEC) COND_LABEL["wheat_" + d] = "wheat on " + ARROW[d];
+  const COND_LABEL = { wheat: "ada gandum di sini", nowheat: "tidak ada gandum di sini", any: "masih ada gandum" };
+  for (const d in DIR_VEC) COND_LABEL["can_" + d] = "bisa gerak " + ARROW[d];
+  for (const d in DIR_VEC) COND_LABEL["no_" + d] = "terhalang " + ARROW[d];
+  for (const d in DIR_VEC) COND_LABEL["wheat_" + d] = "gandum di " + ARROW[d];
 
   // ===== LEVELS =====
   //   title  : level title            hint  : shown when the level starts
@@ -38,8 +39,32 @@ Petani.Config = (function () {
   ];
 
   const RAW_LEVELS = [
-    { title: "Level 1: First row",
-      hint: "The top row is full of wheat. Harvest all of it! Hint: while can move →",
+    { title: "Contoh: Panen Satu Baris",
+      isExample: true,
+      hint: "Kode sudah terisi. Tekan bendera hijau, lalu coba ubah blok-bloknya!",
+      maps: {
+        3: ["WWW",
+            "...",
+            "..."],
+        6: ["WWWWWW",
+            "......",
+            "......",
+            "......",
+            "......",
+            "......"],
+        9: ["WWWWWWWWW",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            ".........",
+            "........."] },
+      sample: [H, { t: "while", v: "can_right", body: [go("right"), H] }] },
+
+    { title: "Level 1: Baris Pertama",
+      hint: "Baris atas penuh gandum. Panen semuanya!",
       minBlocks: 6,
       starThresholds: [6, 8, 10, 13],
       maps: {
@@ -63,8 +88,8 @@ Petani.Config = (function () {
             "........."] },
       sample: [H, { t: "while", v: "can_right", body: [go("right"), H] }] },
 
-    { title: "Level 2: Full field",
-      hint: "Every tile has wheat. Try a loop inside a loop.",
+    { title: "Level 2: Ladang Penuh",
+      hint: "Semua petak berisi gandum. Coba perulangan di dalam perulangan.",
       minBlocks: 9,
       starThresholds: [9, 13, 17, 24],
       maps: {
@@ -88,8 +113,8 @@ Petani.Config = (function () {
             "WWWWWWWWW"] },
       sample: scan([H]) },
 
-    { title: "Level 3: Rock staircase",
-      hint: "Rocks (#) block the way, so \"can move\" is false next to them. Use that to find the end of each row.",
+    { title: "Level 3: Tangga Batu",
+      hint: "Batu menghalangi jalan. Gunakan \"bisa gerak\" untuk menemukan ujung tiap baris.",
       minBlocks: 11,
       starThresholds: [11, 14, 18, 24],
       maps: {
@@ -113,8 +138,8 @@ Petani.Config = (function () {
             "W########"] },
       sample: scan([H]) },
 
-    { title: "Level 4: Checkerboard",
-      hint: "Only some tiles have wheat. Use \"if wheat here\" so you only harvest where there is something.",
+    { title: "Level 4: Papan Catur",
+      hint: "Hanya sebagian petak berisi gandum. Gunakan \"jika ada gandum\".",
       minBlocks: 13,
       starThresholds: [13, 17, 22, 28],
       maps: {
@@ -138,8 +163,8 @@ Petani.Config = (function () {
             "W.W.W.W.W"] },
       sample: scan([{ t: "if", v: "wheat", body: [H] }]) },
 
-    { title: "Level 5: Zigzag path",
-      hint: "Follow the wheat path through the rocks. Try \"while wheat remains\" with an if / else.",
+    { title: "Level 5: Jalur Zigzag",
+      hint: "Ikuti jalur gandum di antara batu. Coba \"selama masih ada gandum\" dengan jika / selain itu.",
       minBlocks: 9,
       starThresholds: [9, 12, 15, 20],
       maps: {
@@ -167,7 +192,7 @@ Petani.Config = (function () {
 
   // Validate + fill defaults, so typos in a map are caught immediately
   const LEVELS = RAW_LEVELS.map((lv, i) => {
-    const name = "Level " + (i + 1), out = Object.assign({ start: [0, 0], sample: [] }, lv);
+    const name = "Level " + i, out = Object.assign({ start: [0, 0], sample: [] }, lv);
     if (!lv.maps[GRID_SIZE]) throw new Error(name + ": no " + GRID_SIZE + "x" + GRID_SIZE + " map in `maps` (GRID_SIZE = " + GRID_SIZE + ")");
     Object.keys(lv.maps).map(Number).forEach((n) => { // every map that exists must be valid
       const m = lv.maps[n];

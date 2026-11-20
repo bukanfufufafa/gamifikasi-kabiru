@@ -86,8 +86,8 @@ Petani.View = (function () {
     if (renderer) return true;
     host = $("#field");
     const fail = (t) => { host.innerHTML = '<p style="padding:12px;margin:0">' + t + "</p>"; return false; };
-    if (typeof THREE === "undefined") return fail("Three.js failed to load. Check your internet connection and reload.");
-    try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); } catch (e) { return fail("This browser does not support WebGL."); }
+    if (typeof THREE === "undefined") return fail("Three.js gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.");
+    try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); } catch (e) { return fail("Peramban ini tidak mendukung WebGL."); }
     unit = new THREE.BoxGeometry(1, 1, 1); rockGeo = new THREE.DodecahedronGeometry(0.36, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -176,7 +176,7 @@ Petani.View = (function () {
   // ----- API (called by main.js) -----
   function drawField() {
     const { size: n, grid, map, pos, score, goal, bumps, bumpDir } = W.state;
-    $("#sc").textContent = "Harvested: " + score + " / " + goal;
+    $("#sc").textContent = "Terpanen: " + score + " / " + goal;
     if (!init()) return;
 
     let snap = false, changed = false;
@@ -202,10 +202,56 @@ Petani.View = (function () {
     tgt.x = tx; tgt.z = tz; lastScore = score; lastBumps = bumps;
   }
 
-  function showLevel(title, goal) { $("#lvt").textContent = title; $("#goal").textContent = "Goal: harvest " + goal; }
+  function showLevel(title) { $("#lvt").textContent = title; }
   function message(text, kind) { const m = $("#msg"); m.textContent = text; m.className = "msg " + (kind || ""); }
   function setRunning(on) { $("#run").disabled = on; }
   function showNext(on) { $("#nx").hidden = !on; }
 
-  return { drawField, showLevel, message, setRunning, showNext };
+  // ===== Thumbnail 3D untuk kartu level (LOD rendah) =====
+  // Satu renderer bersama, tiap level dirender sekali ke gambar PNG lalu di-cache.
+  // Model disederhanakan: tanpa bayangan, gandum = 2 kotak, batu = 1 poligon, petani = 3 kotak.
+  const thumbCache = {};
+  let thumbRenderer = null;
+  function thumbnail(level, n) {
+    const key = level.title + "|" + n;
+    if (key in thumbCache) return thumbCache[key];
+    thumbCache[key] = null; // jika gagal, pakai tampilan CSS sebagai cadangan
+    if (typeof THREE === "undefined") return null;
+    try {
+      const W_PX = 360, H_PX = 260, map = level.maps[n], [sx, sy] = level.start || [0, 0];
+      if (!thumbRenderer) {
+        thumbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+        thumbRenderer.setPixelRatio(1); thumbRenderer.setSize(W_PX, H_PX, false); thumbRenderer.setClearColor(0x000000, 0);
+      }
+      const sc = new THREE.Scene(), geos = [];
+      const g = (geo) => (geos.push(geo), geo);
+      const unitG = g(new THREE.BoxGeometry(1, 1, 1)), rockG = g(new THREE.DodecahedronGeometry(0.36, 0)), hatG = g(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 8));
+      const put = (geo, c, x, y, z, w, h, d) => { const m = new THREE.Mesh(geo, mat(c)); m.position.set(x, y, z); if (w) m.scale.set(w, h, d); sc.add(m); return m; };
+
+      sc.add(new THREE.HemisphereLight(0xffffff, 0x8a7a5a, 0.9));
+      const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(5, 9, 6); sc.add(sun);
+
+      put(unitG, COL.grass, 0, -0.2, 0, n + 0.7, 0.3, n + 0.7);
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const wx = x - (n - 1) / 2, wz = y - (n - 1) / 2, ch = map[y][x];
+        put(unitG, (x + y) % 2 ? COL.soilA : COL.soilB, wx, -0.15, wz, 0.94, 0.3, 0.94);
+        if (ch === "W") { put(unitG, COL.stalk, wx, 0.25, wz, 0.12, 0.5, 0.12); put(unitG, COL.grain, wx, 0.55, wz, 0.2, 0.22, 0.2); }
+        else if (ch === "#") { const r = put(rockG, COL.rock, wx, 0.3, wz); r.scale.set(1, 0.85, 0.9); r.rotation.y = (x * 3 + y) * 0.9; }
+      }
+      const fx = sx - (n - 1) / 2, fz = sy - (n - 1) / 2;
+      put(unitG, COL.shirt, fx, 0.5, fz, 0.45, 0.45, 0.3);
+      put(unitG, COL.skin, fx, 0.88, fz, 0.32, 0.3, 0.3);
+      put(hatG, COL.hat, fx, 1.08, fz);
+
+      const cam = new THREE.PerspectiveCamera(40, W_PX / H_PX, 0.1, 100), yaw = 0.55, pitch = 0.85, d = n * 1.2 + 3, cp = Math.cos(pitch);
+      cam.position.set(Math.sin(yaw) * cp * d, Math.sin(pitch) * d + 0.3, Math.cos(yaw) * cp * d);
+      cam.lookAt(0, 0.1, 0);
+      thumbRenderer.render(sc, cam);
+      thumbCache[key] = thumbRenderer.domElement.toDataURL("image/png");
+      geos.forEach((geo) => geo.dispose());
+    } catch (e) { console.warn("Thumbnail 3D gagal:", e); }
+    return thumbCache[key];
+  }
+
+  return { drawField, showLevel, message, setRunning, showNext, thumbnail };
 })();

@@ -3,115 +3,115 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Farmer: Wheat Harvest</title>
+<title>Kabiru - Platform Gamifikasi Belajar Coding</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
-<header class="menubar">
-  <div class="menu-brand">
-    <h1>🌾 Block Farmer</h1>
-    <span class="menu-badge" id="menu-badge">Level Selector</span>
-  </div>
-  
-  <nav class="menu-nav">
-    <button class="b b-nav active" id="btn-nav-levels" title="Buka Halaman Level Selector">🗺️ Pilih Level</button>
-    <button class="b b-nav" id="btn-nav-game" title="Lanjut ke Ladang Permainan">🎮 Ke Ladang</button>
-  </nav>
+<body class="kabiru-body">
 
-  <span class="menu-lv" id="lvt"></span>
-  <button class="b nx" id="nx" hidden>Next level ▸</button>
-</header>
+<main class="kabiru-main" id="main-content">
 
-<!-- HALAMAN 1: LEVEL SELECTOR -->
-<section class="view-screen active" id="view-selector">
-  <div class="selector-wrap">
-    <!-- Hero / Banner -->
-    <div class="selector-banner">
-      <div class="banner-content">
-        <div class="banner-pill">🌾 Petualangan Panen Gandum</div>
-        <h2 class="banner-title">Halaman Level Selector</h2>
-        <p class="banner-desc">
-          Bantu petani cilik memanen seluruh gandum di ladang dengan menyusun balok logika pemrograman visual!
-          Pilih salah satu level tantangan di bawah untuk memulai.
-        </p>
-        <div class="banner-buttons">
-          <button class="b btn-resume" id="btn-quick-resume">▶ Lanjutkan Petualangan</button>
-          <button class="b g" id="btn-toggle-unlock" title="Buka semua level untuk eksplorasi bebas">🔓 Buka Semua Level</button>
-          <button class="b g" id="btn-reset-progress" title="Reset progres bermain">↺ Reset Progres</button>
-        </div>
-      </div>
+  <!-- TAMPILAN 1: PEMILIH LEVEL -->
+  <div class="content-view active" id="view-sidequest-selector">
+    <div class="content-inner">
 
-      <div class="banner-stats-card">
-        <div class="stats-header">
-          <span class="stats-label">Progres Misi</span>
-          <b class="stats-val" id="stats-progress-text">0 / 5 Selesai</b>
+      <section class="section-progres">
+        <div class="section-title-wrap">
+          <span class="sec-icon">⭐</span>
+          <h3 class="sec-heading">Progres Kamu</h3>
         </div>
-        <div class="progress-track">
-          <div class="progress-bar-fill" id="stats-bar-fill" style="width: 0%;"></div>
-        </div>
-        <div class="stats-stars">
-          <span>⭐ <b id="stats-stars-count">0</b> / 25 Bintang Panen</span>
-          <span class="grid-badge" id="stats-grid-size">Grid 6x6</span>
-        </div>
-      </div>
-    </div>
 
-    <!-- Levels Grid Container -->
-    <div class="levels-container">
-      <div class="levels-header-bar">
-        <div>
-          <h3 class="levels-title">Pilih Tantangan Ladang</h3>
-          <p class="levels-subtitle">Selesaikan level berurutan untuk mengasah kemampuan algoritmamu</p>
+        <div class="progres-card">
+          <h4 class="progres-title">Side Quest: Aura Farming</h4>
+          <div class="progres-bar-container">
+            <div class="progres-track">
+              <div class="progres-fill" id="stats-bar-fill" style="width: 0%;"></div>
+            </div>
+            <div class="progres-info-row">
+              <span class="progres-pct" id="stats-progress-text">0% (0/5 Selesai)</span>
+              <span class="progres-stars-summary">⭐ <b id="stats-stars-count">0</b> / 25 Bintang</span>
+            </div>
+          </div>
+          <div class="progres-actions">
+            <button class="btn-primary-action" id="btn-quick-resume">▶ Lanjutkan Petualangan (Level 1)</button>
+            <button class="btn-subtle" id="btn-toggle-unlock">🔓 Buka Semua Level</button>
+            <button class="btn-subtle" id="btn-reset-progress">↺ Reset Progres</button>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div class="level-cards-grid" id="levels-grid">
-        <!-- Kartu level dibuat secara dinamis oleh main.js -->
-      </div>
+      <section class="section-cards">
+        <div class="section-title-wrap">
+          <span class="sec-icon">📖</span>
+          <div>
+            <h3 class="sec-heading">Modul Belajar (Pilih Level)</h3>
+            <p class="sec-subheading">Pilih salah satu level tantangan coding untuk memulai simulasi panen</p>
+          </div>
+        </div>
+        <div class="kabiru-cards-grid" id="levels-grid"></div>
+      </section>
     </div>
   </div>
-</section>
 
-<!-- HALAMAN 2: GAMEPLAY WORKSPACE -->
-<section class="view-screen" id="view-game">
-  <main class="app">
-    <section class="code-pane">
-      <div class="tabs">
-        <span class="tab"><i class="ic">&lt;/&gt;</i> Code</span>
-        <button class="tab-link-levels" id="tab-to-levels" title="Kembali ke pilihan level">🗺️ Pilih Level Lain</button>
+  <!-- TAMPILAN 2: BERMAIN -->
+  <div class="content-view" id="view-gameplay">
+    <div class="gameplay-wrapper">
+      <div class="game-header-bar">
+        <button class="btn-back-selector" id="btn-back-to-selector">← Kembali ke Pilihan Level</button>
+        <span class="game-level-tag" id="lvt">Level 1</span>
+        <button class="b nx" id="nx" hidden>Level berikutnya ▸</button>
       </div>
-      <div class="blockly-host" id="blockly"></div>
-    </section>
-    <section class="stage-pane">
-      <div class="stage-bar">
-        <button class="icon go" id="run" title="Run (green flag)" aria-label="Run">
-          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M5 21V4" stroke="#2f8a3a" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M5.6 4.6c3.6-2 6.2 1.8 12.4-.4v9c-6.2 2.2-8.8-1.6-12.4.4z" fill="#4cbf56" stroke="#2f8a3a" stroke-width="1.4" stroke-linejoin="round"/></svg>
-        </button>
-        <button class="icon stop" id="rst" title="Stop and reset" aria-label="Stop and reset">
-          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z" fill="#ec5959" stroke="#c43c3c" stroke-width="1.6" stroke-linejoin="round"/></svg>
-        </button>
-        <div class="live-star-badge" id="live-stars-badge" title="Estimasi bintang berdasarkan jumlah balok kode">
-          <span class="star-rating-icons" id="live-stars-icons">⭐⭐⭐⭐⭐</span>
-          <span class="block-counter-pill"><b id="live-block-count">1</b> blok <span class="blk-sep">/</span> <span id="live-target-count">≤ 6</span></span>
-        </div>
-        <span class="stat"><span id="goal"></span><b id="sc"></b></span>
-      </div>
-      <div class="field" id="field"></div>
-      <p class="hint3d">🖱️ Drag the field to rotate the 3D camera.</p>
-      <div class="card">
-        <div class="msg" id="msg"></div>
-        <div class="bar">
-          <button class="b g" id="ex">Show example</button>
-          <button class="b g" id="clr">Clear blocks</button>
-          <button class="b g" id="card-to-levels">🗺️ Menu Level</button>
-          <label class="sp">Speed <input type="range" id="spd" min="1" max="10" value="6"></label>
-        </div>
-      </div>
-    </section>
-  </main>
-</section>
 
-<!-- Order matters: three -> blockly -> config -> world -> interpreter -> view -> editor -> main -->
+      <div class="app">
+        <section class="code-pane">
+          <div class="tabs"><span class="tab"><i class="ic">&lt;/&gt;</i> Kode</span></div>
+          <div class="blockly-host" id="blockly"></div>
+        </section>
+
+        <section class="stage-pane">
+          <div class="stage-bar">
+            <button class="icon go" id="run" title="Jalankan" aria-label="Jalankan">
+              <svg viewBox="0 0 24 24" width="22" height="22"><path d="M5 21V4" stroke="#2f8a3a" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M5.6 4.6c3.6-2 6.2 1.8 12.4-.4v9c-6.2 2.2-8.8-1.6-12.4.4z" fill="#4cbf56" stroke="#2f8a3a" stroke-width="1.4" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="icon stop" id="rst" title="Berhenti dan ulang" aria-label="Berhenti dan ulang">
+              <svg viewBox="0 0 24 24" width="22" height="22"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8z" fill="#ec5959" stroke="#c43c3c" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            </button>
+            <span class="stat"><b id="sc"></b></span>
+          </div>
+
+          <div class="field" id="field"></div>
+          <p class="hint3d">🖱️ Geser ladang untuk memutar kamera 3D.</p>
+
+          <div class="star-row">
+            <div class="live-star-badge" title="Estimasi bintang saat ini">
+              <span class="star-rating-icons" id="live-stars-icons">⭐⭐⭐⭐⭐</span>
+            </div>
+            <button class="btn-info" id="btn-star-info" aria-label="Keterangan bintang" title="Keterangan bintang">i</button>
+          </div>
+
+          <div class="card">
+            <div class="msg" id="msg"></div>
+            <div class="bar">
+              <button class="b g" id="clr">Hapus blok</button>
+              <label class="sp">Kecepatan <input type="range" id="spd" min="1" max="10" value="6"></label>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- POPUP KETERANGAN BINTANG -->
+<div class="modal-backdrop" id="star-modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="star-modal-title">
+    <h3 id="star-modal-title">⭐ Cara Kerja Bintang</h3>
+    <p>Jumlah bintang <b>berkurang</b> seiring bertambahnya jumlah blok kode yang kamu pakai. Semakin sedikit blok, semakin banyak bintang. Gunakan perulangan agar kodemu lebih ringkas!</p>
+    <table class="star-table" id="star-table"></table>
+    <p class="modal-now" id="star-modal-now"></p>
+    <button class="btn-primary-action" id="star-modal-close">Mengerti</button>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="lib/blockly.min.js"></script>
 <script src="js/config.js"></script>
