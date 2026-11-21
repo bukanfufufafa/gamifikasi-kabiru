@@ -1,20 +1,27 @@
-/* main.js — wires all modules together: Kabiru navigation, Side Quest, Level Selector, stars, and Blockly gameplay. */
+/* main.js — wires all modules together: navigation (jenjang -> quest -> level), mission panel, stars, and Blockly gameplay. */
 (function () {
-  const { Config, World, Interpreter, View, Editor } = Petani;
+  const { Config, World, Interpreter, View, Editor, Progress } = Petani;
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => document.querySelectorAll(s);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const MAX_YIELDS = 20000; // safety limit for endless programs
+  const gridSize = Config.GRID_SIZE;
 
-  let levelIndex = 0;
-  let gridSize = Config.GRID_SIZE;
+  let curQuest = null, curLevel = null;
   let ctx = { halt: true };
   let running = false;
+  let nav = { jenjang: null, quest: null }; // what the selector screen is showing
+  let hintShown = 0, extraMode = null;
+
+  const jenjangOf = (id) => Config.JENJANG.find((j) => j.id === id);
+  const questsOf = (jid) => Config.QUESTS.filter((q) => q.jenjang === jid);
+  const realOf = (q) => q.levels.filter((lv) => !lv.isExample);
+  const allReal = () => Config.QUESTS.flatMap((q) => realOf(q).map((lv) => ({ q, lv })));
 
   // ===== STAR RATING SYSTEM (1 - 5 BINTANG) =====
-  function calculateStars(lvlIdx, blockCount) {
-    const lv = Config.LEVELS[lvlIdx];
-    const t = (lv && lv.starThresholds) || [6, 8, 10, 13];
+  // Quests with starMode "learning": finishing the mission is always worth >= 3 stars; a shorter program only adds bonus stars.
+  function calculateStars(lv, blockCount) {
+    const t = lv.starThresholds || [6, 8, 10, 13];
     if (blockCount <= t[0]) return 5;
     if (blockCount <= t[1]) return 4;
     if (blockCount <= t[2]) return 3;
@@ -24,124 +31,39 @@
 
   function renderStarsHtml(count, max = 5) {
     let html = "";
-    for (let i = 1; i <= max; i++) {
-      if (i <= count) {
-        html += '<span class="star-filled">★</span>';
-      } else {
-        html += '<span class="star-empty">★</span>';
-      }
-    }
+    for (let i = 1; i <= max; i++) html += i <= count ? '<span class="star-filled">★</span>' : '<span class="star-empty">★</span>';
     return html;
   }
 
-  // ===== PROGRESS & LOCAL STORAGE =====
-  const STORAGE_KEY = "kabiru_sidequest_progress_v3";
-  let progress = {
-    completed: {},     // { [levelIndex]: true }
-    stars: {},         // { [levelIndex]: number (1-5) }
-    bestBlocks: {},    // { [levelIndex]: number }
-    unlockedAll: false,
-    lastLevel: 0,
-    exp: 10,
-    streak: 0
-  };
-
-  function loadProgress() {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      if (data) {
-        const parsed = JSON.parse(data);
-        if (parsed && typeof parsed === "object") {
-          progress = {
-            completed: parsed.completed || {},
-            stars: parsed.stars || {},
-            bestBlocks: parsed.bestBlocks || {},
-            unlockedAll: !!parsed.unlockedAll,
-            lastLevel: typeof parsed.lastLevel === "number" ? parsed.lastLevel : 0,
-            exp: typeof parsed.exp === "number" ? parsed.exp : 10,
-            streak: typeof parsed.streak === "number" ? parsed.streak : 0
-          };
-        }
-      }
-    } catch (e) {
-      console.warn("Storage warning:", e);
-    }
-  }
-
-  function saveProgress() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-    } catch (e) {
-      console.warn("Storage save failed:", e);
-    }
-  }
-
-  const isExample = (i) => !!(Config.LEVELS[i] && Config.LEVELS[i].isExample);
-  const realLevels = () => Config.LEVELS.map((lv, i) => i).filter((i) => !isExample(i));
-
-  function isLevelCompleted(i) {
-    return !!progress.completed[i];
-  }
-
-  function isLevelUnlocked(i) {
-    if (progress.unlockedAll || isExample(i)) return true;
-    const real = realLevels(), pos = real.indexOf(i);
-    return pos <= 0 || !!progress.completed[real[pos - 1]];
-  }
-
-  function markLevelCompleted(i, blockCount) {
-    const isFirstTime = !progress.completed[i];
-    progress.completed[i] = true;
-
-    // Hitung bintang
-    const currentStars = calculateStars(i, blockCount);
-    const prevStars = progress.stars[i] || 0;
-    if (currentStars > prevStars) {
-      progress.stars[i] = currentStars;
-    }
-
-    const prevBest = progress.bestBlocks[i] || 999;
-    if (blockCount < prevBest) {
-      progress.bestBlocks[i] = blockCount;
-    }
-
-    // Tambah EXP jika berhasil (Gamifikasi)
-    if (isFirstTime) {
-      progress.exp += 25 * currentStars;
-      progress.streak = Math.max(progress.streak, 1);
-    }
-
-    saveProgress();
-    renderLevelSelector();
-  }
+  const isLearning = (q) => q && q.starMode === "learning";
 
   // ===== ESTIMASI BINTANG LANGSUNG =====
   function updateLiveBlockCounter(count) {
+    if (!curLevel) return;
     const blockCount = typeof count === "number" ? count : Editor.getBlockCount();
-    const lv = Config.LEVELS[levelIndex];
-    if (!lv) return;
     const row = $(".star-row");
-    if (row) row.hidden = !!lv.isExample;
+    if (row) row.hidden = !!curLevel.isExample;
     const starsEl = $("#live-stars-icons");
-    if (starsEl && !lv.isExample) starsEl.innerHTML = renderStarsHtml(calculateStars(levelIndex, blockCount));
+    if (starsEl && !curLevel.isExample) starsEl.innerHTML = renderStarsHtml(calculateStars(curLevel, blockCount));
   }
 
   // ===== POPUP KETERANGAN BINTANG =====
   function openStarInfo() {
-    const lv = Config.LEVELS[levelIndex];
+    const lv = curLevel;
     if (!lv || lv.isExample) return;
-    const t = lv.starThresholds || [6, 8, 10, 13];
-    const used = Editor.getBlockCount();
-    const rows = [
-      [5, `${t[0]} blok atau kurang`],
-      [4, `${t[0] + 1} – ${t[1]} blok`],
-      [3, `${t[1] + 1} – ${t[2]} blok`],
-      [2, `${t[2] + 1} – ${t[3]} blok`],
-      [1, `lebih dari ${t[3]} blok`]
-    ];
-    $("#star-table").innerHTML = rows.map(([n, txt]) =>
-      `<tr><td>${renderStarsHtml(n)}</td><td>${txt}</td></tr>`).join("");
-    $("#star-modal-now").innerHTML = `Saat ini kamu memakai <b>${used} blok</b> (termasuk blok "ketika diklik") → <b>${calculateStars(levelIndex, used)} bintang</b>.`;
+    const t = lv.starThresholds || [6, 8, 10, 13], used = Editor.getBlockCount();
+    let rows, intro;
+    if (isLearning(curQuest)) {
+      intro = "Menyelesaikan misi dengan benar <b>selalu</b> mendapat minimal 3 bintang. Bintang bonus diberikan kalau kodemu lebih ringkas.";
+      rows = [[5, `${t[0]} blok atau kurang`], [4, `${t[0] + 1} – ${t[1]} blok`], [3, "Misi selesai"]];
+    } else {
+      intro = "Jumlah bintang <b>berkurang</b> seiring bertambahnya jumlah blok kode yang kamu pakai. Semakin sedikit blok, semakin banyak bintang. Gunakan perulangan agar kodemu lebih ringkas!";
+      rows = [[5, `${t[0]} blok atau kurang`], [4, `${t[0] + 1} – ${t[1]} blok`], [3, `${t[1] + 1} – ${t[2]} blok`],
+              [2, `${t[2] + 1} – ${t[3]} blok`], [1, `lebih dari ${t[3]} blok`]];
+    }
+    $("#star-modal-intro").innerHTML = intro;
+    $("#star-table").innerHTML = rows.map(([n, txt]) => `<tr><td>${renderStarsHtml(n)}</td><td>${txt}</td></tr>`).join("");
+    $("#star-modal-now").innerHTML = `Saat ini kamu memakai <b>${used} blok</b> (termasuk blok "ketika diklik") → <b>${calculateStars(lv, used)} bintang</b> bila misi selesai.`;
     $("#star-modal").hidden = false;
   }
   function closeStarInfo() { $("#star-modal").hidden = true; }
@@ -159,114 +81,180 @@
     toast.textContent = msg;
     toast.classList.add("show");
     clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => {
-      toast.classList.remove("show");
-    }, 2400);
+    toastTimeout = setTimeout(() => toast.classList.remove("show"), 2400);
   }
 
-  // ===== MINI MAP HTML GENERATOR (In Card Banner) =====
-  function generateMiniMapHtml(levelObj, size) {
-    const img = View.thumbnail(levelObj, size);
-    if (img) return `<img class="thumb3d" src="${img}" alt="Pratinjau 3D ${levelObj.title}">`;
-    const map = (levelObj.maps && levelObj.maps[size]) || (levelObj.maps && levelObj.maps[6]) || [];
-    const n = map.length;
-    const [sx, sy] = levelObj.start || [0, 0];
+  const setHash = (h) => { if (location.hash !== h) history.replaceState(null, "", h); };
 
+  // ===== MINI MAP HTML GENERATOR (cadangan jika WebGL tidak tersedia) =====
+  const EMOJI = {
+    farm: { W: "🌾", "#": "🪨", start: "🧑‍🌾" },
+    bekal: { D: "🏠", T: "🧒", "#": "🌳", start: "🤖" },
+    sampah: { "#": "🪨", start: "🤖" },
+    koordinat: { "#": "🪨", start: "🤖" }
+  };
+  function generateMiniMapHtml(q, lv) {
+    const img = View.thumbnail(q, lv);
+    if (img) return `<img class="thumb3d" src="${img}" alt="Pratinjau 3D ${lv.title}">`;
+    const map = Config.mapOf(lv) || [], n = map.length, [sx, sy] = lv.start || [0, 0], em = EMOJI[q.engine];
     let cellsHtml = "";
     for (let y = 0; y < n; y++) {
-      const row = map[y] || "";
       for (let x = 0; x < n; x++) {
-        const ch = row[x] || ".";
-        const soilClass = (x + y) % 2 === 0 ? "m-soil-1" : "m-soil-2";
-        let typeClass = "";
-        let isStart = x === sx && y === sy ? " m-start" : "";
-
-        if (ch === "W") typeClass = " m-wheat";
-        else if (ch === "#") typeClass = " m-rock";
-
-        cellsHtml += `<div class="m-cell ${soilClass}${typeClass}${isStart}"></div>`;
+        const ch = (map[y] || "")[x] || ".";
+        const soil = (x + y) % 2 === 0 ? "m-soil-1" : "m-soil-2";
+        const start = x === sx && y === sy;
+        const icon = start ? em.start : ch in Config.ITEMS ? Config.ITEMS[ch].emoji : em[ch] || "";
+        cellsHtml += `<div class="m-cell ${soil}${ch === "W" ? " m-wheat" : ""}${ch === "#" ? " m-rock" : ""}${start ? " m-start" : ""}">${icon}</div>`;
       }
     }
-
     return `<div class="mini-map" style="grid-template-columns: repeat(${n}, 1fr); grid-template-rows: repeat(${n}, 1fr);">${cellsHtml}</div>`;
   }
 
-  // ===== RENDER PEMILIH LEVEL =====
-  function renderLevelSelector() {
-    const real = realLevels();
-    const totalLevels = real.length;
-    let completedCount = 0, totalStarsEarned = 0;
-    real.forEach((i) => {
-      if (isLevelCompleted(i)) completedCount++;
-      totalStarsEarned += progress.stars[i] || 0;
-    });
+  // ===== RENDER PEMILIH (jenjang -> quest -> level) =====
+  function resumeTarget() {
+    const last = Progress.lastLevel && Config.levelById(Progress.lastLevel);
+    if (last && !last.isExample) {
+      const q = Config.questById(last.questId);
+      if (!Progress.isCompleted(last.id) && Progress.isUnlocked(q, last)) return { q, lv: last };
+    }
+    return allReal().find(({ q, lv }) => !Progress.isCompleted(lv.id) && Progress.isUnlocked(q, lv)) || null;
+  }
 
-    const pct = Math.round((completedCount / totalLevels) * 100);
-    $("#stats-progress-text").textContent = `${pct}% (${completedCount}/${totalLevels} Selesai)`;
+  function renderProgressCard() {
+    const real = allReal();
+    let done = 0, stars = 0;
+    real.forEach(({ lv }) => { if (Progress.isCompleted(lv.id)) done++; stars += Progress.stars(lv.id); });
+    const pct = real.length ? Math.round((done / real.length) * 100) : 0;
+    $("#stats-progress-text").textContent = `${pct}% (${done}/${real.length} Selesai)`;
     $("#stats-bar-fill").style.width = `${pct}%`;
-    $("#stats-stars-count").textContent = `${totalStarsEarned}`;
+    $("#stats-stars-count").textContent = `${stars}`;
+    $("#stats-stars-max").textContent = `${real.length * 5}`;
 
     const unlockBtn = $("#btn-toggle-unlock");
-    unlockBtn.textContent = progress.unlockedAll ? "🔒 Kunci Bertahap" : "🔓 Buka Semua Level";
-    unlockBtn.className = progress.unlockedAll ? "btn-primary-action" : "btn-subtle";
+    unlockBtn.textContent = Progress.unlockedAll ? "🔒 Kunci Bertahap" : "🔓 Buka Semua Level";
+    unlockBtn.className = Progress.unlockedAll ? "btn-primary-action" : "btn-subtle";
 
-    let nextTarget = real[0];
-    for (const i of real) {
-      if (!isLevelCompleted(i) && isLevelUnlocked(i)) { nextTarget = i; break; }
-    }
-    const resumeBtn = $("#btn-quick-resume");
-    if (completedCount === totalLevels) {
-      resumeBtn.textContent = `🏆 Semua Misi Selesai (${totalStarsEarned}/${totalLevels * 5} ⭐) – Main Lagi`;
-      nextTarget = real[0];
+    const resumeBtn = $("#btn-quick-resume"), target = resumeTarget();
+    if (!target) {
+      resumeBtn.textContent = `🏆 Semua Misi Selesai (${stars}/${real.length * 5} ⭐) – Main Lagi`;
+      resumeBtn.onclick = () => openGameLevel(real[0].lv.id);
     } else {
-      resumeBtn.textContent = `▶ Lanjutkan Petualangan (Level ${nextTarget})`;
+      resumeBtn.textContent = `▶ Lanjutkan Petualangan (${target.q.title} – ${target.lv.title.split(":")[0]})`;
+      resumeBtn.onclick = () => openGameLevel(target.lv.id);
     }
-    resumeBtn.onclick = () => openGameLevel(nextTarget);
+  }
 
-    const gridEl = $("#levels-grid");
-    gridEl.innerHTML = "";
-
-    Config.LEVELS.forEach((lv, i) => {
-      const example = !!lv.isExample;
-      const completed = !example && isLevelCompleted(i);
-      const unlocked = isLevelUnlocked(i);
-      const starsEarned = progress.stars[i] || 0;
-
-      const map = (lv.maps && lv.maps[gridSize]) || [];
-      let goalCount = 0;
-      map.forEach((row) => { for (const c of row) if (c === "W") goalCount++; });
-
-      const card = document.createElement("div");
-      const cls = ["kabiru-card"];
-      if (example) cls.push("is-example");
-      if (completed) cls.push("is-completed");
-      if (!unlocked) cls.push("is-locked");
-      card.className = cls.join(" ");
-
-      const btnLabel = !unlocked ? "🔒 Level Terkunci" : example ? "Lihat Contoh" : "Mainkan";
-      const starsRow = example
-        ? `<div class="card-stars-row card-example-tag">Contoh · kode sudah terisi</div>`
-        : `<div class="card-stars-row" title="${starsEarned} dari 5 bintang">${renderStarsHtml(starsEarned)}</div>`;
-
-      card.innerHTML = `
-        <div class="card-banner-preview">${generateMiniMapHtml(lv, gridSize)}</div>
-        <div class="card-body">
-          <h4 class="card-title">${lv.title}</h4>
-          ${starsRow}
-          <p class="card-desc">${lv.hint}</p>
-          <div class="card-meta-row"><span>Target: <b class="card-goal-val">${goalCount} Gandum</b></span></div>
-          <button class="btn-card-blue${!unlocked ? " locked" : ""}" ${!unlocked ? "disabled" : ""}>${btnLabel}</button>
-        </div>`;
-
-      card.onclick = () => {
-        if (!unlocked) {
-          showToast(`⚠️ Selesaikan level sebelumnya dulu, atau klik "Buka Semua Level".`);
-          return;
-        }
-        openGameLevel(i);
-      };
-      gridEl.appendChild(card);
+  function renderJenjang() {
+    const grid = $("#jenjang-grid");
+    grid.innerHTML = "";
+    Config.JENJANG.forEach((j) => {
+      let done = 0, total = 0, stars = 0;
+      questsOf(j.id).forEach((q) => { const s = Progress.summary(q); done += s.done; total += s.total; stars += s.stars; });
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "jenjang-card" + (nav.jenjang === j.id ? " is-selected" : "");
+      btn.setAttribute("aria-pressed", nav.jenjang === j.id ? "true" : "false");
+      btn.innerHTML = `
+        <span class="jenjang-icon">${j.icon}</span>
+        <span class="jenjang-text">
+          <span class="jenjang-name">${j.label} <small>${j.kelas}</small></span>
+          <span class="jenjang-desc">${j.desc}</span>
+          <span class="jenjang-prog">${done}/${total} level · ⭐ ${stars}/${total * 5}</span>
+        </span>`;
+      btn.onclick = () => goNav(j.id, null);
+      grid.appendChild(btn);
     });
+  }
+
+  function questCard(q) {
+    const s = Progress.summary(q), pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+    const card = document.createElement("div");
+    card.className = "quest-card" + (s.done === s.total ? " is-completed" : "");
+    card.innerHTML = `
+      <div class="quest-banner qb-${q.engine}"><span class="quest-emoji">${q.icon}</span></div>
+      <div class="card-body">
+        <div class="quest-chips"><span class="chip">${q.subject}</span><span class="chip chip-alt">${q.skill}</span></div>
+        <h4 class="card-title">${q.title}</h4>
+        <p class="card-desc">${q.desc}</p>
+        <ul class="quest-goals">${q.goals.map((g) => `<li>${g}</li>`).join("")}</ul>
+        <div class="quest-prog">
+          <div class="progres-track"><div class="progres-fill" style="width:${pct}%"></div></div>
+          <div class="card-meta-row"><span>${s.done}/${s.total} level selesai</span><span>⭐ ${s.stars}/${s.maxStars}</span></div>
+        </div>
+        <button class="btn-card-blue">${s.done === 0 ? "Mulai Quest" : s.done === s.total ? "Lihat Level" : "Lanjutkan Quest"}</button>
+      </div>`;
+    card.onclick = () => goNav(q.jenjang, q.id);
+    return card;
+  }
+
+  function levelCard(q, lv) {
+    const example = !!lv.isExample;
+    const completed = !example && Progress.isCompleted(lv.id);
+    const unlocked = Progress.isUnlocked(q, lv);
+    const starsEarned = Progress.stars(lv.id);
+    const card = document.createElement("div");
+    const cls = ["kabiru-card"];
+    if (example) cls.push("is-example");
+    if (completed) cls.push("is-completed");
+    if (!unlocked) cls.push("is-locked");
+    card.className = cls.join(" ");
+
+    const btnLabel = !unlocked ? "🔒 Level Terkunci" : example ? "Lihat Contoh" : "Mainkan";
+    const starsRow = example
+      ? `<div class="card-stars-row card-example-tag">Contoh · kode sudah terisi</div>`
+      : `<div class="card-stars-row" title="${starsEarned} dari 5 bintang">${renderStarsHtml(starsEarned)}</div>`;
+
+    card.innerHTML = `
+      <div class="card-banner-preview">${generateMiniMapHtml(q, lv)}</div>
+      <div class="card-body">
+        <h4 class="card-title">${lv.title}</h4>
+        ${starsRow}
+        <p class="card-desc">${lv.hint}</p>
+        <div class="card-meta-row"><span>Target: <b class="card-goal-val">${Config.goalLabel(q, lv)}</b></span></div>
+        <button class="btn-card-blue${!unlocked ? " locked" : ""}" ${!unlocked ? "disabled" : ""}>${btnLabel}</button>
+      </div>`;
+    card.onclick = () => {
+      if (!unlocked) return showToast(`⚠️ Selesaikan level sebelumnya dulu, atau klik "Buka Semua Level".`);
+      openGameLevel(lv.id);
+    };
+    return card;
+  }
+
+  function renderContent() {
+    const area = $("#cards-area"), head = $("#cards-heading"), sub = $("#cards-subheading"), back = $("#btn-back-quests");
+    area.innerHTML = "";
+    const j = jenjangOf(nav.jenjang), q = nav.quest && Config.questById(nav.quest);
+    if (q) {
+      back.hidden = false;
+      back.textContent = `← Semua quest ${j.label}`;
+      head.textContent = `${q.icon} ${q.title}`;
+      sub.textContent = `${q.subject} · ${q.skill} — pilih level untuk bermain`;
+      const grid = document.createElement("div");
+      grid.className = "kabiru-cards-grid";
+      q.levels.forEach((lv) => grid.appendChild(levelCard(q, lv)));
+      area.appendChild(grid);
+    } else {
+      back.hidden = true;
+      head.textContent = `Quest untuk ${j.label} (${j.kelas})`;
+      sub.textContent = "Pilih salah satu quest untuk memulai petualangan coding";
+      const grid = document.createElement("div");
+      grid.className = "kabiru-cards-grid quest-grid";
+      questsOf(j.id).forEach((qq) => grid.appendChild(questCard(qq)));
+      area.appendChild(grid);
+    }
+  }
+
+  function renderSelector() {
+    renderProgressCard();
+    renderJenjang();
+    renderContent();
+  }
+
+  function goNav(jenjangId, questId) {
+    nav.jenjang = jenjangId; nav.quest = questId;
+    Progress.setLastJenjang(jenjangId);
+    renderSelector();
+    setHash(questId ? `#quest=${questId}` : `#jenjang=${jenjangId}`);
   }
 
   // ===== NAVIGASI =====
@@ -277,43 +265,88 @@
     View.setRunning(false);
   }
 
-  function openSideQuestSelector() {
+  function openSideQuestSelector(opts) {
     stopRun();
+    if (opts && opts.quest && Config.questById(opts.quest)) {
+      nav.quest = opts.quest; nav.jenjang = Config.questById(opts.quest).jenjang;
+    } else if (opts && opts.jenjang && jenjangOf(opts.jenjang)) {
+      nav.jenjang = opts.jenjang; nav.quest = null;
+    }
     $("#view-sidequest-selector").classList.add("active");
     $("#view-gameplay").classList.remove("active");
-    renderLevelSelector();
-    if (location.hash !== "#sidequest") history.replaceState(null, "", "#sidequest");
+    renderSelector();
+    setHash(nav.quest ? `#quest=${nav.quest}` : `#jenjang=${nav.jenjang}`);
   }
 
-  function openGameLevel(targetIdx) {
-    const idx = typeof targetIdx === "number" ? targetIdx : levelIndex;
+  function setTab(name) { // small screens: switch between the code editor and the arena
+    $(".app").dataset.tab = name;
+    $$(".mobile-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+    requestAnimationFrame(() => { Editor.resize(); View.drawField(); });
+  }
+
+  function openGameLevel(id) {
+    const lv = Config.levelById(id);
+    if (!lv) return openSideQuestSelector();
+    const q = Config.questById(lv.questId);
+    nav.jenjang = q.jenjang; nav.quest = q.id;
+    Progress.setLastJenjang(q.jenjang);
     $("#view-sidequest-selector").classList.remove("active");
     $("#view-gameplay").classList.add("active");
-    loadLevel(idx);
+
+    Editor.setTools(Config.toolsOf(q, lv));
+    loadLevel(q, lv);
+    renderMission(lv);
 
     // Level contoh: blok sudah terisi. Level lain: mulai dari kosong.
-    const lv = Config.LEVELS[idx];
     if (lv.isExample) Editor.setProgram(lv.sample); else Editor.clear();
     updateLiveBlockCounter();
-
-    if (location.hash !== `#level=${idx}`) history.replaceState(null, "", `#level=${idx}`);
+    setTab("stage");
+    setHash(`#level=${lv.id}`);
 
     const refresh = () => { Editor.resize(); View.drawField(); updateLiveBlockCounter(); };
     requestAnimationFrame(refresh);
     setTimeout(refresh, 60);
   }
 
+  // ===== MISI, MATERI, PETUNJUK =====
+  function renderMission(lv) {
+    hintShown = 0; extraMode = null;
+    $("#mission-card").hidden = !lv.mission;
+    $("#mission-text").textContent = lv.mission || "";
+    $("#mission-extra").hidden = true;
+    $("#btn-learn").hidden = !lv.learn;
+    $("#btn-hint").hidden = !(lv.hints && lv.hints.length);
+    $("#btn-hint").textContent = "💡 Petunjuk";
+  }
+  function toggleLearn() {
+    const box = $("#mission-extra");
+    if (extraMode === "learn") { box.hidden = true; extraMode = null; return; }
+    extraMode = "learn";
+    box.innerHTML = `<b>📘 Materi</b><p>${curLevel.learn}</p>`;
+    box.hidden = false;
+  }
+  function nextHint() {
+    const hs = curLevel.hints || [];
+    if (!hs.length) return;
+    hintShown = Math.min(hintShown + 1, hs.length);
+    extraMode = "hint";
+    $("#mission-extra").innerHTML = `<b>💡 Petunjuk ${hintShown}/${hs.length}</b><ol>${hs.slice(0, hintShown).map((h) => `<li>${h}</li>`).join("")}</ol>`;
+    $("#mission-extra").hidden = false;
+    $("#btn-hint").textContent = hintShown < hs.length ? `💡 Petunjuk berikutnya (${hintShown}/${hs.length})` : `💡 Petunjuk (${hintShown}/${hs.length})`;
+  }
+
   // ===== GAMEPLAY ENGINE =====
-  function loadLevel(i) {
-    levelIndex = i;
-    progress.lastLevel = i;
-    saveProgress();
+  function loadLevel(q, lv) {
+    curQuest = q; curLevel = lv;
+    Progress.setLastLevel(lv.id);
 
     ctx.halt = true;
     running = false;
-    World.load(i, gridSize);
-    View.showLevel(Config.LEVELS[i].title, World.state.goal);
-    View.message(Config.LEVELS[i].hint);
+    World.load(q, lv, gridSize);
+    const j = jenjangOf(q.jenjang);
+    View.showLevel(lv.title);
+    $("#game-chip").textContent = `${j.icon} ${j.label} · ${q.icon} ${q.title}`;
+    View.message(lv.mission ? "Tekan bendera hijau ▶ untuk menjalankan programmu." : lv.hint);
     View.showNext(false);
     View.setRunning(false);
     Editor.setLocked(false);
@@ -325,18 +358,34 @@
   function reset() {
     ctx.halt = true;
     setTimeout(() => {
-      loadLevel(levelIndex);
+      loadLevel(curQuest, curLevel);
       updateLiveBlockCounter();
     }, 30);
   }
 
+  function successMessage(q, lv, stars, blocksUsed) {
+    if (!isLearning(q)) {
+      const minOptimal = lv.minBlocks || 6;
+      if (stars === 5) return `🏆 Sempurna! 5/5 bintang dengan ${blocksUsed} blok.`;
+      if (stars === 4) return `🌟 Hebat! 4/5 bintang (${blocksUsed} blok). Kurangi blok hingga ≤ ${minOptimal} untuk 5 bintang.`;
+      if (stars === 3) return `👍 Bagus! 3/5 bintang (${blocksUsed} blok). Pakai perulangan agar ≤ ${minOptimal} blok.`;
+      return `🎉 Berhasil! ${stars}/5 bintang (${blocksUsed} blok). Pakai perulangan agar kodemu lebih ringkas.`;
+    }
+    const t = lv.starThresholds || [6, 8];
+    const bonus = stars === 5 ? "Kodemu ringkas sekali, bonus bintang penuh! 🏆"
+      : stars === 4 ? `Kodemu ringkas, bonus 1 bintang! Kurangi hingga ≤ ${t[0]} blok untuk 5 bintang.`
+      : `Bonus bintang: coba buat kodemu lebih ringkas (≤ ${t[1]} blok untuk 4 bintang).`;
+    return `✅ Misi selesai! ${lv.explain} Kamu mendapat ${stars}/5 bintang (${blocksUsed} blok). ${bonus}`;
+  }
+
   async function runProgram() {
     if (running) return;
+    setTab("stage"); // layar kecil: tampilkan arena agar pesan dan animasi terlihat
     const prog = Editor.getProgram();
     if (!prog) return View.message("Tambahkan blok \"ketika 🏁 diklik\" dari kategori Kejadian untuk memulai program.", "er");
     if (!prog.length) return View.message("Program masih kosong. Hubungkan blok aksi di bawah blok \"ketika diklik\".", "er");
 
-    loadLevel(levelIndex);
+    loadLevel(curQuest, curLevel);
     const mine = (ctx = { halt: false, hl: Editor.highlight });
     running = true;
     Editor.setLocked(true);
@@ -354,6 +403,7 @@
       }
       if (step) {
         View.drawField();
+        if (World.failure()) { mine.halt = true; break; } // rule broken (e.g. wrong bin)
         if (World.isWon()) {
           won = true;
           break;
@@ -370,53 +420,52 @@
     Editor.setLocked(false);
     View.setRunning(false);
 
-    const { goal, score } = World.state;
+    const failure = World.failure();
+    if (failure) {
+      mine.halt = true;
+      View.message("⚠️ " + failure, "er");
+      return;
+    }
+
     if (won) {
       mine.halt = true;
-      const lv = Config.LEVELS[levelIndex];
-      const next = levelIndex + 1 < Config.LEVELS.length;
+      const q = curQuest, lv = curLevel, nextLv = q.levels[lv.index + 1];
 
       if (lv.isExample) {
         View.message("Contoh berhasil dijalankan! Sekarang coba susun kodemu sendiri di Level 1.", "ok");
-        View.showNext(next);
+        View.showNext(!!nextLv);
       } else {
         const blocksUsed = Editor.getBlockCount();
-        const starsEarned = calculateStars(levelIndex, blocksUsed);
-        markLevelCompleted(levelIndex, blocksUsed);
-        const minOptimal = lv.minBlocks || 6;
-        const last = levelIndex === Config.LEVELS.length - 1;
-
-        let fb;
-        if (starsEarned === 5) fb = `🏆 Sempurna! 5/5 bintang dengan ${blocksUsed} blok.`;
-        else if (starsEarned === 4) fb = `🌟 Hebat! 4/5 bintang (${blocksUsed} blok). Kurangi blok hingga ≤ ${minOptimal} untuk 5 bintang.`;
-        else if (starsEarned === 3) fb = `👍 Bagus! 3/5 bintang (${blocksUsed} blok). Pakai perulangan agar ≤ ${minOptimal} blok.`;
-        else fb = `🎉 Berhasil! ${starsEarned}/5 bintang (${blocksUsed} blok). Pakai perulangan agar kodemu lebih ringkas.`;
-
-        View.message(last ? `${fb} Kamu menyelesaikan semua level! 🌾` : fb, "ok");
-        View.showNext(!last);
+        const starsEarned = calculateStars(lv, blocksUsed);
+        Progress.recordCompletion(lv.id, starsEarned, blocksUsed);
+        renderSelector();
+        const fb = successMessage(q, lv, starsEarned, blocksUsed);
+        View.message(nextLv ? fb : `${fb} Kamu menyelesaikan semua level di ${q.title}! ${q.icon}`, "ok");
+        View.showNext(!!nextLv);
       }
     } else if (!mine.halt) {
-      View.message("Program selesai, tapi baru " + score + " dari " + goal + " gandum yang terpanen. Coba perbaiki blok kodemu.", "er");
+      View.message(World.incomplete(), "er");
     }
   }
 
   // ===== EVENT LISTENER =====
-  $("#btn-back-to-selector").onclick = openSideQuestSelector;
+  $("#btn-back-to-selector").onclick = () => openSideQuestSelector({ quest: curQuest && curQuest.id });
+  $("#btn-back-quests").onclick = () => goNav(nav.jenjang, null);
 
   // Run / Reset / Next in Gameplay
   $("#run").onclick = runProgram;
   $("#rst").onclick = reset;
   $("#nx").onclick = () => {
-    if (levelIndex + 1 < Config.LEVELS.length) {
-      openGameLevel(levelIndex + 1);
-    } else {
-      openSideQuestSelector();
-    }
+    const nextLv = curQuest.levels[curLevel.index + 1];
+    if (nextLv) openGameLevel(nextLv.id); else openSideQuestSelector({ quest: curQuest.id });
   };
   $("#clr").onclick = () => {
     Editor.clear();
     updateLiveBlockCounter();
   };
+  $("#btn-learn").onclick = toggleLearn;
+  $("#btn-hint").onclick = nextHint;
+  $$(".mobile-tabs button").forEach((b) => { b.onclick = () => setTab(b.dataset.tab); });
   $("#btn-star-info").onclick = openStarInfo;
   $("#star-modal-close").onclick = closeStarInfo;
   $("#star-modal").onclick = (e) => { if (e.target.id === "star-modal") closeStarInfo(); };
@@ -424,46 +473,43 @@
 
   // Level Selector Action Buttons
   $("#btn-toggle-unlock").onclick = () => {
-    progress.unlockedAll = !progress.unlockedAll;
-    saveProgress();
-    renderLevelSelector();
-    showToast(progress.unlockedAll ? "🔓 Semua level sekarang terbuka!" : "🔒 Mode kunci bertahap aktif kembali.");
+    Progress.setUnlockedAll(!Progress.unlockedAll);
+    renderSelector();
+    showToast(Progress.unlockedAll ? "🔓 Semua level sekarang terbuka!" : "🔒 Mode kunci bertahap aktif kembali.");
   };
 
   $("#btn-reset-progress").onclick = () => {
     if (confirm("Apakah kamu yakin ingin mereset seluruh progres bermain dan bintang?")) {
-      progress.completed = {};
-      progress.stars = {};
-      progress.bestBlocks = {};
-      progress.unlockedAll = false;
-      progress.lastLevel = 0;
-      progress.exp = 10;
-      progress.streak = 0;
-      saveProgress();
-      renderLevelSelector();
+      Progress.reset();
+      renderSelector();
       showToast("Progres dan bintang berhasil di-reset ke awal.");
     }
   };
 
-  // URL Hash routing
+  // URL Hash routing: #jenjang=<id> | #quest=<id> | #level=<quest>:<level>   (#level=<angka> = tautan lama Petani Blok)
   function handleRoute() {
     const hash = location.hash;
-    if (hash.startsWith("#level=")) {
-      const num = parseInt(hash.replace("#level=", ""), 10);
-      if (!isNaN(num) && num >= 0 && num < Config.LEVELS.length) {
-        openGameLevel(num);
-        return;
-      }
+    let m;
+    if ((m = /^#level=(.+)$/.exec(hash))) {
+      let id = decodeURIComponent(m[1]);
+      if (/^\d+$/.test(id)) id = "petani:" + (+id === 0 ? "contoh" : id);
+      if (Config.levelById(id)) return openGameLevel(id);
+    } else if ((m = /^#quest=(.+)$/.exec(hash)) && Config.questById(m[1])) {
+      return openSideQuestSelector({ quest: m[1] });
+    } else if ((m = /^#jenjang=(.+)$/.exec(hash)) && jenjangOf(m[1])) {
+      return openSideQuestSelector({ jenjang: m[1] });
     }
-    // Default: pemilih level
-    openSideQuestSelector();
+    openSideQuestSelector(); // default: pemilih jenjang
   }
 
   window.addEventListener("hashchange", handleRoute);
 
   // ===== INITIALIZATION =====
-  loadProgress();
-  Editor.init("#blockly");
+  Progress.load();
+  const lastLv = Progress.lastLevel && Config.levelById(Progress.lastLevel);
+  nav.jenjang = (lastLv && Config.questById(lastLv.questId).jenjang) || Progress.lastJenjang || Config.JENJANG[0].id;
+  if (!jenjangOf(nav.jenjang)) nav.jenjang = Config.JENJANG[0].id;
+  Editor.init("#blockly", []);
   Editor.onChange((count) => updateLiveBlockCounter(count));
   handleRoute();
 })();
