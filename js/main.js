@@ -19,15 +19,7 @@
   const allReal = () => Config.QUESTS.flatMap((q) => realOf(q).map((lv) => ({ q, lv })));
 
   // ===== STAR RATING SYSTEM (1 - 5 BINTANG) =====
-  // Quests with starMode "learning": finishing the mission is always worth >= 3 stars; a shorter program only adds bonus stars.
-  function calculateStars(lv, blockCount) {
-    const t = lv.starThresholds || [6, 8, 10, 13];
-    if (blockCount <= t[0]) return 5;
-    if (blockCount <= t[1]) return 4;
-    if (blockCount <= t[2]) return 3;
-    if (blockCount <= t[3]) return 2;
-    return 1;
-  }
+  const calculateStars = Config.calculateStars;
 
   function renderStarsHtml(count, max = 5) {
     let html = "";
@@ -35,7 +27,7 @@
     return html;
   }
 
-  const isLearning = (q) => q && q.starMode === "learning";
+
 
   // ===== ESTIMASI BINTANG LANGSUNG =====
   function updateLiveBlockCounter(count) {
@@ -52,15 +44,9 @@
     const lv = curLevel;
     if (!lv || lv.isExample) return;
     const t = lv.starThresholds || [6, 8, 10, 13], used = Editor.getBlockCount();
-    let rows, intro;
-    if (isLearning(curQuest)) {
-      intro = "Menyelesaikan misi dengan benar <b>selalu</b> mendapat minimal 3 bintang. Bintang bonus diberikan kalau kodemu lebih ringkas.";
-      rows = [[5, `${t[0]} blok atau kurang`], [4, `${t[0] + 1} – ${t[1]} blok`], [3, "Misi selesai"]];
-    } else {
-      intro = "Jumlah bintang <b>berkurang</b> seiring bertambahnya jumlah blok kode yang kamu pakai. Semakin sedikit blok, semakin banyak bintang. Gunakan perulangan agar kodemu lebih ringkas!";
-      rows = [[5, `${t[0]} blok atau kurang`], [4, `${t[0] + 1} – ${t[1]} blok`], [3, `${t[1] + 1} – ${t[2]} blok`],
-              [2, `${t[2] + 1} – ${t[3]} blok`], [1, `lebih dari ${t[3]} blok`]];
-    }
+    const intro = "Misi harus selesai dengan benar untuk mendapatkan bintang. Semakin ringkas programmu, semakin banyak bintangnya: dari <b>1 sampai 5 bintang</b>. Semua blok yang terhubung ke blok mulai, termasuk kondisi, ikut dihitung.";
+    const rows = [[5, `${t[0]} blok atau kurang`], [4, `${t[0] + 1} – ${t[1]} blok`], [3, `${t[1] + 1} – ${t[2]} blok`],
+                  [2, `${t[2] + 1} – ${t[3]} blok`], [1, `lebih dari ${t[3]} blok`]];
     $("#star-modal-intro").innerHTML = intro;
     $("#star-table").innerHTML = rows.map(([n, txt]) => `<tr><td>${renderStarsHtml(n)}</td><td>${txt}</td></tr>`).join("");
     $("#star-modal-now").innerHTML = `Saat ini kamu memakai <b>${used} blok</b> (termasuk blok "ketika diklik") → <b>${calculateStars(lv, used)} bintang</b> bila misi selesai.`;
@@ -94,6 +80,10 @@
     koordinat: { "#": "🪨", start: "🤖" }
   };
   function generateMiniMapHtml(q, lv) {
+    if (q.engine === "musik" || q.engine === "lampu") {
+      const label = q.engine === "musik" ? "🥁 🔔 👏" : "🌙 → 💡 ← 🧑‍🎓";
+      return `<div class="activity-preview" aria-label="${q.title}"><span>${label}</span><b>${Config.goalLabel(q, lv)}</b></div>`;
+    }
     const img = View.thumbnail(q, lv);
     if (img) return `<img class="thumb3d" src="${img}" alt="Pratinjau 3D ${lv.title}">`;
     const map = Config.mapOf(lv) || [], n = map.length, [sx, sy] = lv.start || [0, 0], em = EMOJI[q.engine];
@@ -260,6 +250,7 @@
   // ===== NAVIGASI =====
   function stopRun() {
     ctx.halt = true;
+    Petani.ActivityView.stopAudio();
     running = false;
     Editor.setLocked(false);
     View.setRunning(false);
@@ -285,6 +276,7 @@
   }
 
   function openGameLevel(id) {
+    stopRun();
     const lv = Config.levelById(id);
     if (!lv) return openSideQuestSelector();
     const q = Config.questById(lv.questId);
@@ -356,30 +348,20 @@
   }
 
   function reset() {
-    ctx.halt = true;
-    setTimeout(() => {
-      loadLevel(curQuest, curLevel);
-      updateLiveBlockCounter();
-    }, 30);
+    stopRun();
+    loadLevel(curQuest, curLevel);
+    updateLiveBlockCounter();
   }
 
   function successMessage(q, lv, stars, blocksUsed) {
-    if (!isLearning(q)) {
-      const minOptimal = lv.minBlocks || 6;
-      if (stars === 5) return `🏆 Sempurna! 5/5 bintang dengan ${blocksUsed} blok.`;
-      if (stars === 4) return `🌟 Hebat! 4/5 bintang (${blocksUsed} blok). Kurangi blok hingga ≤ ${minOptimal} untuk 5 bintang.`;
-      if (stars === 3) return `👍 Bagus! 3/5 bintang (${blocksUsed} blok). Pakai perulangan agar ≤ ${minOptimal} blok.`;
-      return `🎉 Berhasil! ${stars}/5 bintang (${blocksUsed} blok). Pakai perulangan agar kodemu lebih ringkas.`;
-    }
-    const t = lv.starThresholds || [6, 8];
-    const bonus = stars === 5 ? "Kodemu ringkas sekali, bonus bintang penuh! 🏆"
-      : stars === 4 ? `Kodemu ringkas, bonus 1 bintang! Kurangi hingga ≤ ${t[0]} blok untuk 5 bintang.`
-      : `Bonus bintang: coba buat kodemu lebih ringkas (≤ ${t[1]} blok untuk 4 bintang).`;
-    return `✅ Misi selesai! ${lv.explain} Kamu mendapat ${stars}/5 bintang (${blocksUsed} blok). ${bonus}`;
+    const feedback = stars === 5 ? "🏆 Kodemu ringkas sekali!" : `Coba ringkas programmu hingga ≤ ${lv.starThresholds[0]} blok untuk 5 bintang.`;
+    return `✅ Misi selesai! ${lv.explain || ""} Kamu mendapat ${stars}/5 bintang (${blocksUsed} blok). ${feedback}`;
   }
 
   async function runProgram() {
     if (running) return;
+    Petani.ActivityView.stopAudio();
+    const audioReady = curQuest.engine === "musik" ? Petani.ActivityView.activateAudio() : null;
     setTab("stage"); // layar kecil: tampilkan arena agar pesan dan animasi terlihat
     const prog = Editor.getProgram();
     if (!prog) return View.message("Tambahkan blok \"ketika 🏁 diklik\" dari kategori Kejadian untuk memulai program.", "er");
@@ -395,25 +377,41 @@
     let count = 0, won = false;
     const delay = () => 620 - +$("#spd").value * 55;
 
-    for (const step of Interpreter.run(prog, mine)) {
-      if (++count > MAX_YIELDS) {
-        mine.halt = true;
-        View.message("Program terlalu panjang atau terjadi infinite loop. Periksa blok while / repeat until.", "er");
-        break;
-      }
-      if (step) {
-        View.drawField();
-        if (World.failure()) { mine.halt = true; break; } // rule broken (e.g. wrong bin)
-        if (World.isWon()) {
-          won = true;
-          break;
+    try {
+      await audioReady; // Do not drop the first note while the browser resumes its AudioContext.
+      if (mine.halt || ctx !== mine) return;
+      do {
+        for (const step of Interpreter.run(prog, mine)) {
+          if (++count > MAX_YIELDS) {
+            mine.halt = true;
+            View.message("Program terlalu panjang atau terjadi infinite loop. Periksa jumlah pengulangan dan kondisinya.", "er");
+            break;
+          }
+          if (step) {
+            View.drawField();
+            if (World.failure()) { mine.halt = true; break; }
+            if (World.isWon()) { won = true; break; }
+            await sleep(delay());
+          } else if (count % 250 === 0) {
+            await sleep(0); // Let Stop/navigation interrupt even a loop with no actions.
+          }
+          if (mine.halt || ctx !== mine) break;
         }
-        await sleep(delay());
-      }
-      if (mine.halt) break;
+        if (mine.halt || ctx !== mine || won) break;
+        World.finishProgram();
+        View.drawField();
+        won = World.isWon();
+        if (curQuest.engine === "lampu") await sleep(delay());
+      } while (!mine.halt && ctx === mine && World.nextScenario());
+    } catch (error) {
+      if (ctx !== mine) return;
+      mine.halt = true;
+      View.message("Program tidak dapat dijalankan. Periksa susunan blok dan coba ulangi.", "er");
+      console.error(error);
     }
 
-    if (ctx !== mine) return;
+    if (ctx !== mine || (mine.halt && !running)) return;
+    Petani.ActivityView.stopAudio();
     View.drawField();
     won = won || World.isWon();
     running = false;

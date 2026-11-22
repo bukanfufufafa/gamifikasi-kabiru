@@ -16,17 +16,54 @@ Petani.World = (function () {
   function load(q, lv, size) {
     version++; // lets the view know it must rebuild the arena
     quest = q; level = lv; engine = q.engine; ENG = ENGINES[engine];
-    map = lv.maps ? lv.maps[size] : lv.map; N = map.length;
+    map = (lv.maps ? lv.maps[size] : lv.map) || []; N = map.length;
     grid = map.map((row) => [...row].map((ch) => ({
       rock: ch === "#", wheat: ch === "W", kitchen: ch === "D", friend: ch === "T", fed: false,
       item: ch in C.ITEMS ? ch : null, item0: ch in C.ITEMS ? ch : null
     })));
-    pos = lv.start.slice(); score = 0; bumps = 0; bumpDir = [0, 0]; failMsg = null; E = {};
+    pos = (lv.start || [0, 0]).slice(); score = 0; bumps = 0; bumpDir = [0, 0]; failMsg = null; E = {};
     ENG.setup();
   }
 
   // ===== Engines =====
   const ENGINES = {
+    // Non-grid activities must finish the whole program before their result is accepted.
+    musik: {
+      setup() { goal = level.pattern.length; E = { output: [], finished: false }; },
+      test: () => false,
+      actions: {
+        play(instrument) {
+          const labels = { drum: "drum", bell: "lonceng", clap: "tepuk" };
+          const index = E.output.length;
+          E.output.push(instrument);
+          if (index >= goal) return fail("Ada bunyi tambahan setelah pola selesai. Hapus blok bunyi yang berlebih atau kurangi jumlah pengulangan.");
+          if (instrument !== level.pattern[index]) return fail("Bunyi ke-" + (index + 1) + " seharusnya " + labels[level.pattern[index]] + ", bukan " + labels[instrument] + ". Perhatikan urutan pola contoh.");
+          score++;
+        }
+      },
+      won: () => E.finished && score === goal,
+      status: () => "Pola cocok: " + score + " / " + goal,
+      incomplete: () => "Program baru memainkan " + E.output.length + " dari " + goal + " bunyi. Lengkapi pola sesuai contoh.",
+      sig: () => String(E.output.length)
+    },
+    lampu: {
+      setup() {
+        goal = level.scenarios.length;
+        E = { scenarioIndex: 0, scenarioResults: level.scenarios.map((s) => ({ ...s, actual: null, passed: false, tested: false })), lamp: null, finished: false };
+      },
+      test(cond) { return !!level.scenarios[E.scenarioIndex][cond]; },
+      actions: { lamp(value) { E.lamp = value === "on"; } },
+      won: () => E.finished && score === goal,
+      status: () => "Skenario cocok: " + score + " / " + goal,
+      incomplete() {
+        const wrong = E.scenarioResults.find((s) => !s.passed);
+        if (!wrong) return "Selesaikan semua pemeriksaan kondisi ruangan.";
+        const inputs = (wrong.dark ? "gelap" : "terang") + ", " + (wrong.occupied ? "ada orang" : "kosong") + ", mode darurat " + (wrong.emergency ? "aktif" : "mati");
+        return "Belum semua skenario tepat. Saat " + inputs + ", lampu harus " + (wrong.expected ? "menyala" : "mati") + (wrong.actual === null ? ", tetapi program belum menentukan keadaan lampu. Isi kedua cabang jika/selain itu." : ". Periksa aturan kondisi programmu.");
+      },
+      sig: () => E.scenarioIndex + "|" + E.lamp + "|" + score
+    },
+
     // ---- Petani Blok
     farm: {
       setup() { goal = grid.flat().filter((c) => c.wheat).length; },
@@ -164,19 +201,40 @@ Petani.World = (function () {
       const v = C.DIR_VEC[dir], x = pos[0] + v[0], y = pos[1] + v[1];
       if (free(x, y)) pos = [x, y]; else { bumps++; bumpDir = v; } // blocked by an obstacle or the edge
     },
-    harvest: act("harvest"), take: act("take"), deliver: act("deliver"), pick: act("pick"), sort: act("sort"), mark: act("mark")
+    harvest: act("harvest"), take: act("take"), deliver: act("deliver"), pick: act("pick"), sort: act("sort"), mark: act("mark"),
+    play: act("play"), lamp: act("lamp")
   };
   actions.sample = actions.mark;
 
+  function finishProgram() {
+    if (engine === "musik") E.finished = true;
+    if (engine === "lampu") {
+      const result = E.scenarioResults[E.scenarioIndex];
+      result.tested = true;
+      result.actual = E.lamp;
+      result.passed = E.lamp !== null && E.lamp === result.expected;
+      score = E.scenarioResults.filter((s) => s.passed).length;
+      E.finished = E.scenarioIndex === goal - 1;
+    }
+  }
+
+  function nextScenario() {
+    if (engine !== "lampu" || E.scenarioIndex >= goal - 1) return false;
+    E.scenarioIndex++;
+    E.lamp = null; // Each input combination is an independent execution, never a continuation.
+    return true;
+  }
+
   return {
-    load, test, actions,
+    load, test, actions, finishProgram, nextScenario,
     isWon: () => !failMsg && ENG.won(),
     failure: () => failMsg,
     incomplete: () => ENG.incomplete(),
     status: () => ENG.status(),
     get state() {
       return { version, engine, quest, level, size: N, grid, map, pos, score, goal, bumps, bumpDir, sig: ENG.sig(),
-               carried: E.carried, lastSort: E.lastSort, targets: E.targets || [], half: E.half };
+               carried: E.carried, lastSort: E.lastSort, targets: E.targets || [], half: E.half,
+               output: E.output || [], scenarioIndex: E.scenarioIndex, scenarioResults: E.scenarioResults || [], lamp: E.lamp };
     }
   };
 })();

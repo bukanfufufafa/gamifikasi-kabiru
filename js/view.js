@@ -293,8 +293,10 @@ Petani.View = (function () {
   // ----- Per-frame animation -----
   const clock = typeof THREE === "undefined" ? null : new THREE.Clock();
   const popScale = (p) => 0.15 + 0.85 * (1 - Math.pow(1 - p, 3));
+  let activityVisible = false, animationFrame = null;
   function loop() {
-    requestAnimationFrame(loop);
+    if (activityVisible) return;
+    animationFrame = requestAnimationFrame(loop);
     const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime, limb = actor.limb, body = actor.g;
 
     // Character: smooth slide, small hop, swinging limbs, turns toward the walking direction
@@ -381,6 +383,22 @@ Petani.View = (function () {
   function drawField() {
     const st = W.state;
     $("#sc").textContent = W.status();
+    const field = $("#field"), wasActivity = activityVisible;
+    activityVisible = st.engine === "musik" || st.engine === "lampu";
+    field.dataset.engine = st.engine;
+    document.querySelectorAll(".hint3d").forEach((hint) => { hint.hidden = activityVisible; });
+    if (activityVisible) {
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+      animationFrame = null;
+      // Keep the WebGL canvas and its event handlers alive outside the activity DOM.
+      if (renderer && renderer.domElement.parentNode === field) renderer.domElement.remove();
+      Petani.ActivityView.draw(st);
+      return;
+    }
+    if (wasActivity) {
+      Petani.ActivityView.stopAudio();
+      if (renderer) field.replaceChildren(renderer.domElement);
+    }
     if (!init()) return;
 
     let snap = false;
@@ -396,6 +414,12 @@ Petani.View = (function () {
     else if (st.bumps > lastBumps) { tgtFace = Math.atan2(st.bumpDir[0], st.bumpDir[1]); bump = 1; }
     else if (acted) swing = 1;
     tgt.x = tx; tgt.z = tz; lastSig = st.sig; lastBumps = st.bumps;
+    if (wasActivity) {
+      const w = field.clientWidth, h = field.clientHeight;
+      if (w && h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+      // init() starts a new renderer's loop; only restart a previously paused one.
+      if (animationFrame === null) { clock.getDelta(); loop(); }
+    }
   }
 
   function showLevel(title) { $("#lvt").textContent = title; }

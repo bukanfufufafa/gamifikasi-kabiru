@@ -1,7 +1,7 @@
 /* interpreter.js — runs the program tree using generators.
    The tree comes from editor.js (built from the Blockly workspace):
      [{ id, t, v?, cond?, body?, orelse? }, ...]
-     cond = expression tree: { c: "wheat" | "any" | "can" | "blocked" | "wheat_dir" | "item_here" | "item_is", d } | { c: "not", a } | { c: "and"|"or", a, b }
+     cond = expression tree: { c: "wheat" | "any" | "can" | "blocked" | "wheat_dir" | "item_here" | "item_is" | "dark" | "occupied" | "emergency", d? } | { c: "not", a } | { c: "and"|"or", a, b }
    yield 1 = one action finished (UI may redraw and wait)
    yield 0 = just a loop iteration (no pause, but counted by the safety limit)
    ctx.hl(id) is called before each block runs, so the editor can highlight it (like Scratch). */
@@ -19,6 +19,9 @@ Petani.Interpreter = (function () {
       case "wheat_dir": return W.test("wheat_" + e.d);
       case "item_here": return W.test("item_here");
       case "item_is":   return W.test("is_" + e.d);
+      case "dark":      return W.test("dark");
+      case "occupied":  return W.test("occupied");
+      case "emergency": return W.test("emergency");
       case "not":       return !ev(e.a);
       case "and":       return ev(e.a) && ev(e.b);
       case "or":        return ev(e.a) || ev(e.b);
@@ -35,6 +38,8 @@ Petani.Interpreter = (function () {
     *sort(b)    { W.actions.sort(b.v); yield 1; },
     *mark()     { W.actions.mark(); yield 1; },
     *sample()   { W.actions.sample(); yield 1; },
+    *play(b)    { W.actions.play(b.v); yield 1; },
+    *lamp(b)    { W.actions.lamp(b.v); yield 1; },
     *repeat(b, ctx) { for (let i = 0; i < b.v && !ctx.halt; i++) { yield* run(b.body, ctx); yield 0; } },
     *while(b, ctx)  { while (!ctx.halt && ev(b.cond)) { yield* run(b.body, ctx); yield 0; } },
     *until(b, ctx)  { while (!ctx.halt && !ev(b.cond)) { yield* run(b.body, ctx); yield 0; } },

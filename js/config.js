@@ -8,7 +8,7 @@ window.Petani = window.Petani || {};
 Petani.Config = (function () {
   // ===== GRID SIZE for the farm quest (ubah di sini) =====
   // Setiap level Petani Blok harus punya map untuk ukuran ini di `maps`. Bawaan tersedia: 3, 6, 9.
-  // Quest lain memakai satu `map` persegi sendiri (ukuran bebas, mis. 5, 6, 7).
+  // Quest grid lain memakai satu `map` persegi sendiri; musik dan lampu tidak memakai peta.
   const GRID_SIZE = 6;
 
   const DIR_VEC = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
@@ -64,7 +64,9 @@ Petani.Config = (function () {
   // ===== QUESTS =====
   //   Level fields (all quests):
   //     key, title, mission (goal text), learn (learning note), hint (shown at start), hints[] (💡 button), explain (shown after success)
-  //     tools (optional, overrides quest.tools)   sample (example solution tree {t, v, body, orelse})
+  //     tools (optional, overrides quest.tools)   sample (example solution tree {t, v, cond, body, orelse})
+  //     Non-grid: musik uses pattern[]; lampu uses scenarios[] and cond expressions {c, a?, b?}.
+  //     Block counts include the start hat, control/action blocks, and every condition node.
   //     minBlocks + starThresholds [5★, 4★, 3★, 2★ max blocks]
   //   Map legend:  farm  . soil  W wheat  # rock
   //                bekal . floor  D dapur  T teman  # pagar
@@ -73,7 +75,7 @@ Petani.Config = (function () {
   const RAW_QUESTS = [
     // ---------------------------------------------------------------- SD AWAL
     { id: "bekal", jenjang: "sd-awal", icon: "🤖", title: "Robot Pengantar Bekal",
-      subject: "Matematika", skill: "Urutan instruksi", engine: "bekal", starMode: "learning",
+      subject: "Matematika", skill: "Urutan instruksi", engine: "bekal", starMode: "efficiency",
       desc: "Bantu robot mengantar bekal ke teman-temanmu. Hitung dulu berapa bekal yang dibutuhkan, lalu susun perintahnya!",
       goals: ["Menghitung jumlah benda", "Menjumlahkan bilangan sampai 9", "Menyusun perintah secara berurutan"],
       tools: ["move", "take", "deliver", "repeat"],
@@ -87,7 +89,7 @@ Petani.Config = (function () {
                   "Lalu: gerak ke kanan, antar bekal. Lakukan lagi untuk teman berikutnya."],
           explain: "3 teman, tiap teman 1 bekal: 1 + 1 + 1 = 3 bekal.",
           tools: ["move", "take", "deliver"],
-          minBlocks: 8, starThresholds: [8, 11, 999, 999],
+          minBlocks: 8, starThresholds: [8, 11, 14, 17],
           map: [".....",
                 ".....",
                 "DTTT.",
@@ -104,7 +106,7 @@ Petani.Config = (function () {
                   "Jumlahkan kedua kelompok untuk tahu berapa bekal yang harus diambil.",
                   "Blok \"ulangi\" membantu kalau teman berjajar lurus."],
           explain: "Kelompok atas 2 teman + kelompok bawah 3 teman: 2 + 3 = 5 bekal.",
-          minBlocks: 13, starThresholds: [13, 17, 999, 999],
+          minBlocks: 13, starThresholds: [13, 17, 21, 25],
           map: ["D.TT..",
                 "......",
                 "......",
@@ -122,7 +124,7 @@ Petani.Config = (function () {
                   "Kamu cukup mengambil bekal sekali di dapur.",
                   "Rencanakan rute dulu: kelompok atas, tengah, lalu bawah. Hindari pohon 🌳."],
           explain: "3 + 2 + 4 = 9 bekal. Semua teman kebagian!",
-          minBlocks: 21, starThresholds: [21, 26, 999, 999],
+          minBlocks: 21, starThresholds: [21, 26, 31, 36],
           map: ["D.TTT.",
                 "..#...",
                 ".TT#..",
@@ -134,9 +136,46 @@ Petani.Config = (function () {
                    rep(2, go("down")), go("right"), give, rep(3, go("right"), give)] }
       ] },
 
+    // --------------------------------------------------------- SD AWAL: MUSIK
+    { id: "musik", jenjang: "sd-awal", icon: "🎵", title: "Studio Musik Pola",
+      subject: "Seni Musik · Matematika", skill: "Pola & pengulangan", engine: "musik", starMode: "efficiency",
+      desc: "Kenali pola bunyi drum, bel, dan tepuk tangan, lalu susun musik dengan perulangan.",
+      goals: ["Mengenali pola AB, AAB, dan ABC", "Menyusun urutan bunyi", "Meringkas pola dengan perulangan"],
+      tools: ["play", "repeat"],
+      levels: [
+        { key: "1", title: "Level 1: Sapa dengan Bunyi",
+          mission: "Mainkan drum lalu bel, dua kali: drum, bel, drum, bel.",
+          learn: "Pola AB terdiri dari dua bunyi berbeda. A adalah drum dan B adalah bel; urutannya selalu sama.",
+          hint: "Dengarkan satu pasangan drum–bel, lalu susun pasangan itu dua kali.",
+          hints: ["A = drum, B = bel.", "Susun empat blok bunyi: drum, bel, drum, bel.", "Coba ringkas pasangan drum–bel dengan ulangi 2 kali."],
+          explain: "AB dua kali menghasilkan ABAB: drum, bel, drum, bel.",
+          minBlocks: 4, starThresholds: [4, 5, 7, 9],
+          pattern: ["drum", "bell", "drum", "bell"],
+          sample: [rep(2, { t: "play", v: "drum" }, { t: "play", v: "bell" })] },
+        { key: "2", title: "Level 2: Irama Berulang",
+          mission: "Mainkan pola drum–bel tiga kali. Gunakan perulangan agar kodemu ringkas.",
+          learn: "Perulangan menjalankan satu kelompok perintah berkali-kali tanpa menyalin semua bloknya.",
+          hint: "Masukkan satu pasangan drum–bel ke dalam ulangi 3 kali.",
+          hints: ["Targetnya ABABAB, yaitu enam bunyi.", "Isi perulangan hanya drum lalu bel.", "Pilih 3 pada blok ulangi, bukan 6: satu putaran sudah berisi dua bunyi."],
+          explain: "Dua blok bunyi dalam ulangi 3 kali menghasilkan enam bunyi dengan urutan ABABAB.",
+          minBlocks: 4, starThresholds: [4, 6, 8, 10],
+          pattern: ["drum", "bell", "drum", "bell", "drum", "bell"],
+          sample: [rep(3, { t: "play", v: "drum" }, { t: "play", v: "bell" })] },
+        { key: "3", title: "Level 3: Konser Dua Pola",
+          mission: "Mainkan AAB dua kali, lalu ABC dua kali. A = drum, B = bel, dan C = tepuk tangan.",
+          learn: "Unit pola bisa memiliki tiga bunyi: AAB mengulang bunyi pertama, sedangkan ABC memakai tiga bunyi berbeda.",
+          hint: "Buat dua perulangan berurutan: ulangi AAB dua kali, lalu ulangi ABC dua kali.",
+          hints: ["AAB = drum, drum, bel.", "ABC = drum, bel, tepuk tangan.", "Susun ulangi 2 kali berisi AAB, lalu ulangi 2 kali berisi ABC."],
+          explain: "(AAB) dua kali lalu (ABC) dua kali menghasilkan AABAABABCABC. Setiap perulangan menyimpan satu unit pola.",
+          minBlocks: 9, starThresholds: [9, 11, 13, 16],
+          pattern: ["drum", "drum", "bell", "drum", "drum", "bell", "drum", "bell", "clap", "drum", "bell", "clap"],
+          sample: [rep(2, { t: "play", v: "drum" }, { t: "play", v: "drum" }, { t: "play", v: "bell" }),
+                   rep(2, { t: "play", v: "drum" }, { t: "play", v: "bell" }, { t: "play", v: "clap" })] }
+      ] },
+
     // --------------------------------------------------------------- SD AKHIR
     { id: "sampah", jenjang: "sd-akhir", icon: "♻️", title: "Misi Bank Sampah",
-      subject: "IPA · Lingkungan", skill: "Pengulangan & kondisi", engine: "sampah", starMode: "learning",
+      subject: "IPA · Lingkungan", skill: "Pengulangan & kondisi", engine: "sampah", starMode: "efficiency",
       desc: "Bantu robot memilah sampah ke tong yang tepat. Kenali bahan tiap benda, temukan polanya, dan biarkan robot memilih sendiri!",
       goals: ["Mengenali bahan: kertas, plastik, organik", "Menemukan pola dan memakai perulangan", "Memilih tindakan dengan \"jika\""],
       tools: ["move", "pick", "sort", "repeat"],
@@ -150,7 +189,7 @@ Petani.Config = (function () {
                   "Pilih tong di blok \"pilah ke tong\" sesuai bahan benda."],
           explain: "Koran dan kardus → kertas, botol → plastik. Memilah sampah memudahkan daur ulang.",
           tools: ["move", "pick", "sort"],
-          minBlocks: 9, starThresholds: [9, 12, 999, 999],
+          minBlocks: 9, starThresholds: [9, 12, 15, 18],
           map: [".....",
                 ".....",
                 "kbd..",
@@ -167,7 +206,7 @@ Petani.Config = (function () {
                   "Satu putaran pola = ambil, pilah, gerak, ambil, pilah, gerak.",
                   "Masukkan satu putaran itu ke dalam \"ulangi 3 kali\"."],
           explain: "Polanya (kertas, plastik) berulang 3 kali, jadi cukup satu blok \"ulangi\".",
-          minBlocks: 8, starThresholds: [8, 12, 999, 999],
+          minBlocks: 8, starThresholds: [8, 12, 16, 20],
           map: ["......",
                 "......",
                 "kbdgkb",
@@ -186,7 +225,7 @@ Petani.Config = (function () {
                   "Bungkus semuanya dalam \"ulangi 6 kali\", dan jangan lupa gerak ke kanan."],
           explain: "Dengan \"jika\", robot memutuskan sendiri tong mana yang tepat untuk tiap benda.",
           tools: ["move", "pick", "sort", "repeat", "if", "ifelse", "s:item_here", "s:item_is"],
-          minBlocks: 15, starThresholds: [15, 19, 999, 999],
+          minBlocks: 15, starThresholds: [15, 19, 23, 27],
           map: ["......",
                 "......",
                 "kpbdag",
@@ -357,7 +396,7 @@ Petani.Config = (function () {
 
     // -------------------------------------------------------------------- SMP
     { id: "ekspedisi", jenjang: "smp", icon: "🚀", title: "Ekspedisi Robot Penjelajah",
-      subject: "Matematika", skill: "Perencanaan rute", engine: "koordinat", starMode: "learning",
+      subject: "Matematika", skill: "Perencanaan rute", engine: "koordinat", starMode: "efficiency",
       desc: "Pandu robot menjelajahi planet asing memakai koordinat Kartesius. Baca sumbu x dan y, hitung langkahnya, lalu rencanakan rutenya!",
       goals: ["Membaca dan menuliskan koordinat (x, y)", "Memahami koordinat negatif", "Merencanakan rute dengan selisih koordinat"],
       tools: ["move", "mark", "repeat"],
@@ -373,7 +412,7 @@ Petani.Config = (function () {
           tools: ["move", "mark"],
           showTargets: true,
           targets: [{ label: "A", x: 3, y: 2 }],
-          minBlocks: 7, starThresholds: [7, 10, 999, 999],
+          minBlocks: 7, starThresholds: [7, 10, 13, 16],
           map: [".......",
                 ".......",
                 ".......",
@@ -394,7 +433,7 @@ Petani.Config = (function () {
           explain: "A (-2, 1): 2 ke kiri, 1 ke atas. B (1, -3): 1 ke kanan, 3 ke bawah dari titik asal.",
           showTargets: false,
           targets: [{ label: "A", x: -2, y: 1 }, { label: "B", x: 1, y: -3 }],
-          minBlocks: 10, starThresholds: [10, 14, 999, 999],
+          minBlocks: 10, starThresholds: [10, 14, 18, 22],
           map: [".......",
                 ".......",
                 ".......",
@@ -416,7 +455,7 @@ Petani.Config = (function () {
           tools: ["move", "sample", "repeat"],
           showTargets: false, mode: "collect", home: true,
           targets: [{ label: "S1", x: -3, y: 2 }, { label: "S2", x: 2, y: 2 }, { label: "S3", x: 2, y: -2 }],
-          minBlocks: 20, starThresholds: [20, 26, 999, 999],
+          minBlocks: 20, starThresholds: [20, 26, 32, 38],
           map: [".......",
                 "..###..",
                 ".......",
@@ -427,10 +466,67 @@ Petani.Config = (function () {
           start: [3, 3],
           sample: [rep(2, go("right")), rep(2, go("up")), grab, go("up"), rep(5, go("left")), go("down"), grab,
                    rep(4, go("down")), rep(5, go("right")), grab, rep(2, go("left")), rep(2, go("up"))] }
+      ] },
+
+    // --------------------------------------------------------------- SMP: LAMPU
+    { id: "lampu", jenjang: "smp", icon: "💡", title: "Laboratorium Lampu Pintar",
+      subject: "Informatika", skill: "Logika Boolean & percabangan", engine: "lampu", starMode: "efficiency",
+      desc: "Rancang aturan lampu otomatis dengan sensor gelap, keberadaan orang, dan keadaan darurat.",
+      goals: ["Memilih dua tindakan dengan jika–selain itu", "Menggabungkan kondisi dengan AND dan OR", "Menguji aturan pada semua kombinasi masukan"],
+      tools: ["lamp", "ifelse", "s:dark", "s:occupied", "s:emergency", "logic"],
+      levels: [
+        { key: "1", title: "Level 1: Sensor Gelap",
+          mission: "Nyalakan lampu jika gelap; selain itu matikan. Aturanmu harus benar pada kedua skenario.",
+          learn: "Kondisi Boolean bernilai benar atau salah. Jika–selain itu memilih tepat satu tindakan berdasarkan nilai sensor.",
+          hint: "Hubungkan sensor gelap ke kondisi jika–selain itu.",
+          hints: ["Saat dark benar, lampu harus menyala.", "Saat dark salah, lampu harus mati.", "Isi cabang jika dengan lampu on dan cabang selain itu dengan lampu off."],
+          explain: "Aturan lampu = dark lulus untuk dua kemungkinan: terang dan gelap.",
+          tools: ["lamp", "ifelse", "s:dark"],
+          minBlocks: 5, starThresholds: [5, 7, 9, 11],
+          scenarios: [
+            { dark: false, occupied: false, emergency: false, expected: false },
+            { dark: true, occupied: false, emergency: false, expected: true }
+          ],
+          sample: [{ t: "ifelse", cond: { c: "dark" }, body: [{ t: "lamp", v: "on" }], orelse: [{ t: "lamp", v: "off" }] }] },
+        { key: "2", title: "Level 2: Hemat Energi",
+          mission: "Nyalakan lampu hanya jika gelap DAN ada orang; selain itu matikan. Uji keempat kombinasi sensor.",
+          learn: "AND bernilai benar hanya jika kedua kondisi benar. Ruangan kosong tidak perlu penerangan meskipun gelap.",
+          hint: "Gabungkan sensor gelap dan ada orang dengan AND.",
+          hints: ["Terang dan kosong: mati. Terang dan ada orang: tetap mati.", "Gelap dan kosong: mati. Gelap dan ada orang: menyala.", "Kondisi jika adalah dark AND occupied; kedua cabang tetap mengatur on dan off."],
+          explain: "dark AND occupied hanya benar pada satu dari empat kombinasi masukan.",
+          tools: ["lamp", "ifelse", "s:dark", "s:occupied", "logic"],
+          minBlocks: 7, starThresholds: [7, 9, 11, 14],
+          scenarios: [
+            { dark: false, occupied: false, emergency: false, expected: false },
+            { dark: false, occupied: true, emergency: false, expected: false },
+            { dark: true, occupied: false, emergency: false, expected: false },
+            { dark: true, occupied: true, emergency: false, expected: true }
+          ],
+          sample: [{ t: "ifelse", cond: { c: "and", a: { c: "dark" }, b: { c: "occupied" } },
+                     body: [{ t: "lamp", v: "on" }], orelse: [{ t: "lamp", v: "off" }] }] },
+        { key: "3", title: "Level 3: Prioritas Darurat",
+          mission: "Nyalakan lampu saat darurat ATAU saat gelap DAN ada orang; selain itu matikan. Luluskan semua delapan skenario.",
+          learn: "OR benar jika setidaknya satu kondisi benar. Kelompokkan dark AND occupied sebelum menggabungkannya dengan emergency memakai OR.",
+          hint: "Susun emergency OR (dark AND occupied) sebagai kondisi jika–selain itu.",
+          hints: ["Saat emergency benar, lampu selalu menyala tanpa melihat sensor lain.", "Saat tidak darurat, gunakan kembali aturan dark AND occupied.", "Letakkan AND di salah satu masukan OR; masukan lainnya adalah sensor darurat."],
+          explain: "emergency OR (dark AND occupied) menyalakan lampu pada semua keadaan darurat, atau ketika ruangan gelap dan terisi.",
+          minBlocks: 9, starThresholds: [9, 12, 15, 18],
+          scenarios: [
+            { dark: false, occupied: false, emergency: false, expected: false },
+            { dark: false, occupied: false, emergency: true, expected: true },
+            { dark: false, occupied: true, emergency: false, expected: false },
+            { dark: false, occupied: true, emergency: true, expected: true },
+            { dark: true, occupied: false, emergency: false, expected: false },
+            { dark: true, occupied: false, emergency: true, expected: true },
+            { dark: true, occupied: true, emergency: false, expected: true },
+            { dark: true, occupied: true, emergency: true, expected: true }
+          ],
+          sample: [{ t: "ifelse", cond: { c: "or", a: { c: "emergency" }, b: { c: "and", a: { c: "dark" }, b: { c: "occupied" } } },
+                     body: [{ t: "lamp", v: "on" }], orelse: [{ t: "lamp", v: "off" }] }] }
       ] }
   ];
 
-  // ===== Validate + fill defaults, so typos in a map are caught immediately =====
+  // ===== Validate + fill defaults for grid and non-grid engines =====
   const LEGAL = {
     farm: (ch) => ch in TILE,
     bekal: (ch) => ".DT#".includes(ch),
@@ -441,7 +537,31 @@ Petani.Config = (function () {
   const QUESTS = RAW_QUESTS.map((q) => {
     q.levels = q.levels.map((lv, index) => {
       const name = q.title + " / " + lv.title;
-      const out = Object.assign({ start: [0, 0], sample: [] }, lv, { id: q.id + ":" + lv.key, questId: q.id, index });
+      const isGrid = Object.prototype.hasOwnProperty.call(LEGAL, q.engine);
+      const out = Object.assign(isGrid ? { start: [0, 0], sample: [] } : { sample: [] }, lv, { id: q.id + ":" + lv.key, questId: q.id, index });
+      if (q.engine !== "farm") {
+        const thresholds = lv.starThresholds;
+        if (!Number.isInteger(lv.minBlocks) || lv.minBlocks < 1 || !Array.isArray(thresholds) || thresholds.length !== 4 ||
+            thresholds[0] !== lv.minBlocks || thresholds.some((n, i) => !Number.isFinite(n) || n < 1 || (i > 0 && n <= thresholds[i - 1]))) {
+          throw new Error(name + ": expected minBlocks and four finite, strictly increasing star cutoffs");
+        }
+      }
+      if (!isGrid) {
+        if (lv.map !== undefined || lv.maps !== undefined) throw new Error(name + ": non-grid levels must omit maps");
+        if (q.engine === "musik") {
+          if (!Array.isArray(lv.pattern) || !lv.pattern.length || lv.pattern.some((sound) => !["drum", "bell", "clap"].includes(sound))) {
+            throw new Error(name + ": expected a nonempty pattern of drum, bell, or clap");
+          }
+        } else if (q.engine === "lampu") {
+          if (!Array.isArray(lv.scenarios) || !lv.scenarios.length || lv.scenarios.some((s) =>
+              !s || ["dark", "occupied", "emergency", "expected"].some((key) => typeof s[key] !== "boolean"))) {
+            throw new Error(name + ": expected scenarios with boolean dark, occupied, emergency, and expected");
+          }
+        } else {
+          throw new Error(name + ": unknown engine " + q.engine);
+        }
+        return out;
+      }
       const maps = lv.maps ? lv.maps : { [(lv.map || []).length]: lv.map };
       if (lv.maps && !lv.maps[GRID_SIZE]) throw new Error(name + ": no " + GRID_SIZE + "x" + GRID_SIZE + " map in `maps` (GRID_SIZE = " + GRID_SIZE + ")");
       Object.keys(maps).map(Number).forEach((n) => { // every map that exists must be valid
@@ -472,7 +592,7 @@ Petani.Config = (function () {
     const [qid, key] = String(id).split(":"), q = questById(qid);
     return q ? q.levels.find((lv) => lv.key === key) || null : null;
   };
-  const mapOf = (lv) => (lv.maps ? lv.maps[GRID_SIZE] : lv.map);
+  const mapOf = (lv) => (lv.maps ? lv.maps[GRID_SIZE] : lv.map || null);
   const toolsOf = (q, lv) => lv.tools || q.tools;
 
   // Short goal text for level cards
@@ -483,9 +603,18 @@ Petani.Config = (function () {
       case "bekal":     return count((c) => c === "T") + " Teman";
       case "sampah":    return count((c) => c in ITEMS) + " Benda";
       case "koordinat": return (lv.targets || []).length + (lv.mode === "collect" ? " Sampel" : " Titik");
+      case "musik":     return (lv.pattern || []).length + " Bunyi";
+      case "lampu":     return (lv.scenarios || []).length + " Skenario";
     }
     return "";
   }
 
-  return { GRID_SIZE, DIR_VEC, JENJANG, QUESTS, ITEMS, BINS, CAT_TIP, TILE, questById, levelById, mapOf, toolsOf, goalLabel };
+  // Cutoffs are inclusive maxima for 5, 4, 3, and 2 stars; larger programs earn 1.
+  function calculateStars(lv, count) {
+    const thresholds = lv.starThresholds || [];
+    const tier = thresholds.findIndex((max) => count <= max);
+    return tier === -1 ? 1 : 5 - tier;
+  }
+
+  return { GRID_SIZE, DIR_VEC, JENJANG, QUESTS, ITEMS, BINS, CAT_TIP, TILE, questById, levelById, mapOf, toolsOf, goalLabel, calculateStars };
 })();

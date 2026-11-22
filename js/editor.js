@@ -36,6 +36,10 @@ Petani.Editor = (function () {
       message0: "tandai titik 📍", previousStatement: null, nextStatement: null },
     { type: "petani_sample", style: "action_blocks", tooltip: "Ambil sampel di titik tempat robot berdiri.",
       message0: "ambil sampel 🧪", previousStatement: null, nextStatement: null },
+    { type: "petani_play", style: "action_blocks", tooltip: "Mainkan alat musik yang dipilih.",
+      message0: "mainkan %1", args0: [{ type: "field_dropdown", name: "INST", options: [["drum", "drum"], ["lonceng", "bell"], ["tepuk", "clap"]] }], previousStatement: null, nextStatement: null },
+    { type: "petani_lamp", style: "action_blocks", tooltip: "Nyalakan atau matikan lampu.",
+      message0: "lampu %1", args0: [{ type: "field_dropdown", name: "STATE", options: [["nyala", "on"], ["mati", "off"]] }], previousStatement: null, nextStatement: null },
 
     { type: "petani_repeat", style: "control_blocks", tooltip: "Ulangi blok di dalamnya beberapa kali.",
       message0: "ulangi %1 kali", args0: [{ type: "field_number", name: "TIMES", value: 3, min: 1, max: 99, precision: 1 }],
@@ -60,7 +64,10 @@ Petani.Editor = (function () {
     { type: "petani_blocked", style: "sensing_blocks", message0: "terhalang %1 ?", args0: [dirField], output: "Boolean", tooltip: "Benar jika ada batu atau tepi ladang di arah itu." },
     { type: "petani_wheat_dir", style: "sensing_blocks", message0: "ada gandum di %1 ?", args0: [dirField], output: "Boolean", tooltip: "Benar jika petak berikutnya di arah itu berisi gandum." },
     { type: "petani_item_here", style: "sensing_blocks", message0: "ada benda di sini?", output: "Boolean", tooltip: "Benar jika ada benda di petak tempat robot berdiri." },
-    { type: "petani_item_is", style: "sensing_blocks", message0: "jenis benda = %1 ?", args0: [binField], output: "Boolean", tooltip: "Benar jika benda di petak ini terbuat dari bahan yang dipilih." }
+    { type: "petani_item_is", style: "sensing_blocks", message0: "jenis benda = %1 ?", args0: [binField], output: "Boolean", tooltip: "Benar jika benda di petak ini terbuat dari bahan yang dipilih." },
+    { type: "petani_dark", style: "sensing_blocks", message0: "gelap?", output: "Boolean", tooltip: "Benar jika keadaan gelap." },
+    { type: "petani_occupied", style: "sensing_blocks", message0: "ada orang?", output: "Boolean", tooltip: "Benar jika ada orang." },
+    { type: "petani_emergency", style: "sensing_blocks", message0: "darurat?", output: "Boolean", tooltip: "Benar jika terjadi keadaan darurat." }
   ];
 
   // ===== Toolbox (Scratch categories) =====
@@ -68,9 +75,9 @@ Petani.Editor = (function () {
 
   // Each level lists the tools it allows (config.js `tools`): action/control names, "s:<sensor>" and "logic".
   // Categories without any allowed block are left out of the toolbox.
-  const ACTIONS = ["harvest", "take", "deliver", "pick", "sort", "mark", "sample"];
+  const ACTIONS = ["harvest", "take", "deliver", "pick", "sort", "mark", "sample", "play", "lamp"];
   const CONTROLS = ["repeat", "while", "until", "if", "ifelse"];
-  const SENSORS = ["wheat_here", "wheat_any", "can_move", "blocked", "wheat_dir", "item_here", "item_is"];
+  const SENSORS = ["wheat_here", "wheat_any", "can_move", "blocked", "wheat_dir", "item_here", "item_is", "dark", "occupied", "emergency"];
   const SENSOR_DEFAULTS = { can_move: { DIR: "right" }, blocked: { DIR: "right" }, wheat_dir: { DIR: "right" }, item_is: { CAT: "kertas" } };
   const SORT_DEFAULT = { CAT: "kertas" };
 
@@ -132,6 +139,9 @@ Petani.Editor = (function () {
       case "petani_wheat_dir":  return { c: "wheat_dir", d: b.getFieldValue("DIR") };
       case "petani_item_here":  return { c: "item_here" };
       case "petani_item_is":    return { c: "item_is", d: b.getFieldValue("CAT") };
+      case "petani_dark":       return { c: "dark" };
+      case "petani_occupied":   return { c: "occupied" };
+      case "petani_emergency":  return { c: "emergency" };
       case "logic_negate":      return { c: "not", a: expr(b.getInputTargetBlock("BOOL")) };
       case "logic_operation":   return { c: b.getFieldValue("OP") === "OR" ? "or" : "and",
                                          a: expr(b.getInputTargetBlock("A")), b: expr(b.getInputTargetBlock("B")) };
@@ -150,6 +160,8 @@ Petani.Editor = (function () {
       case "petani_sort":    return { id, t: "sort", v: b.getFieldValue("CAT") };
       case "petani_mark":    return { id, t: "mark" };
       case "petani_sample":  return { id, t: "sample" };
+      case "petani_play":    return { id, t: "play", v: b.getFieldValue("INST") };
+      case "petani_lamp":    return { id, t: "lamp", v: b.getFieldValue("STATE") };
       case "petani_repeat":  return { id, t: "repeat", v: +b.getFieldValue("TIMES") || 1, body: body() };
       case "petani_while":   return { id, t: "while", cond: cond(), body: body() };
       case "petani_until":   return { id, t: "until", cond: cond(), body: body() };
@@ -165,8 +177,29 @@ Petani.Editor = (function () {
     return hats.length ? chain(hats[0].getNextBlock()) : null;
   }
 
-  // ===== Program tree (config.js samples: {t, v, body, orelse}) -> Blockly JSON =====
+  // ===== Program tree (config.js samples: {t, v, cond, body, orelse}) -> Blockly JSON =====
   function condJson(v) {
+    if (!v) return null;
+    if (typeof v === "object") {
+      const inputs = {};
+      const add = (name, e) => { const block = condJson(e); if (block) inputs[name] = { block }; };
+      if (v.c === "not") {
+        add("BOOL", v.a);
+        return { type: "logic_negate", inputs };
+      }
+      if (v.c === "and" || v.c === "or") {
+        add("A", v.a);
+        add("B", v.b);
+        return { type: "logic_operation", fields: { OP: v.c.toUpperCase() }, inputs };
+      }
+      const type = { wheat: "wheat_here", any: "wheat_any", can: "can_move", blocked: "blocked", wheat_dir: "wheat_dir", item_here: "item_here", item_is: "item_is", dark: "dark", occupied: "occupied", emergency: "emergency" }[v.c];
+      if (!type) return null;
+      const j = { type: "petani_" + type };
+      if (["can", "blocked", "wheat_dir"].includes(v.c)) j.fields = { DIR: v.d };
+      if (v.c === "item_is") j.fields = { CAT: v.d };
+      return j;
+    }
+    if (["dark", "occupied", "emergency"].includes(v)) return { type: "petani_" + v };
     if (v === "wheat") return { type: "petani_wheat_here" };
     if (v === "any") return { type: "petani_wheat_any" };
     if (v === "nowheat") return { type: "logic_negate", inputs: { BOOL: { block: { type: "petani_wheat_here" } } } };
@@ -191,7 +224,12 @@ Petani.Editor = (function () {
     if (n.t === "repeat") j.fields = { TIMES: n.v };
     if (n.t === "take") j.fields = { NUM: n.v };
     if (n.t === "sort") j.fields = { CAT: n.v };
-    if (["while", "until", "if", "ifelse"].includes(n.t)) inputs.COND = { block: condJson(n.v) };
+    if (n.t === "play") j.fields = { INST: n.v };
+    if (n.t === "lamp") j.fields = { STATE: n.v };
+    if (["while", "until", "if", "ifelse"].includes(n.t)) {
+      const block = condJson(n.cond !== undefined ? n.cond : n.v);
+      if (block) inputs.COND = { block };
+    }
     if (n.body && n.body.length) inputs.DO = { block: listJson(n.body) };
     if (n.orelse && n.orelse.length) inputs.ELSE = { block: listJson(n.orelse) };
     return j;
