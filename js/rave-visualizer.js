@@ -16,6 +16,7 @@
   const ctx = canvas.getContext("2d");
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   const localFileMode = window.location.protocol === "file:";
+  const localFileWarning = "Audio tidak dapat diputar saat halaman dibuka tanpa server. Jalankan proyek dengan \"py -m http.server 8000\", lalu buka \"http://localhost:8000\".";
   const ANALYSIS_INTERVAL_MS = 30;
   const ONSET_HISTORY_SIZE = 44;
   const PERCUSSION_REFRACTORY_MS = 65;
@@ -632,6 +633,10 @@
   }
 
   async function playExperience() {
+    if (localFileMode) {
+      soundStatus.textContent = localFileWarning;
+      return;
+    }
     audio.muted = false;
     audio.volume = 1;
     setupAudioAnalysis();
@@ -647,6 +652,10 @@
 
   function toggleAudio() {
     soundStatus.textContent = "";
+    if (localFileMode) {
+      soundStatus.textContent = localFileWarning;
+      return;
+    }
     if (!audio.paused) {
       audio.pause();
       return;
@@ -681,6 +690,11 @@
     stopVisualizer();
   });
   audio.addEventListener("error", () => {
+    if (localFileMode) {
+      soundStatus.textContent = localFileWarning;
+      updateSoundButton();
+      return;
+    }
     const code = audio.error ? audio.error.code : "unknown";
     soundStatus.textContent = `The browser could not load sound-effect.m4a (media error ${code}).`;
     updateSoundButton();
