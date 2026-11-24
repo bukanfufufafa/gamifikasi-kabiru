@@ -34,20 +34,22 @@ Total: 20 tantangan dan satu contoh. Pemetaan materi/usia masih perlu validasi p
 
 ## Struktur
 
-- `js/config.js`: jenjang, quest, level, solusi contoh, ambang dan kalkulasi bintang.
-- `js/world.js`: keadaan permainan dan aturan keberhasilan, termasuk finalisasi program serta isolasi skenario lampu.
-- `js/interpreter.js`: menjalankan AST blok, tanpa evaluasi kode JavaScript siswa.
-- `js/editor.js`: definisi Blockly, toolbox per level, konversi AST.
-- `js/view.js`: arena 3D dan routing tampilan; `js/activity-view.js`: arena musik/lampu dan audio opsional.
-- `js/main.js`: navigasi, eksekusi, pembatalan, feedback, dan popup bintang.
-- `js/progress.js`: progres localStorage berbasis ID stabil; bukan progres akun siswa/API website induk.
+Semua berkas aplikasi berada langsung di folder proyek tanpa subfolder.
+
+- `config.js`: jenjang, quest, level, solusi contoh, ambang dan kalkulasi bintang.
+- `world.js`: keadaan permainan dan aturan keberhasilan, termasuk finalisasi program serta isolasi skenario lampu.
+- `interpreter.js`: menjalankan AST blok, tanpa evaluasi kode JavaScript siswa.
+- `editor.js`: definisi Blockly, toolbox per level, konversi AST.
+- `view.js`: arena 3D dan routing tampilan; `activity-view.js`: arena musik/lampu dan audio opsional.
+- `main.js`: navigasi, eksekusi, pembatalan, feedback, dan popup bintang.
+- `progress.js`: progres localStorage berbasis ID stabil; bukan progres akun siswa/API website induk.
 
 ## Validasi
 
 Dengan Node.js:
 
 ```sh
-node tools/check-levels.js
+node check-levels.js
 ```
 
 Menguji solusi contoh seluruh level, batas semua tingkat bintang, keluaran musik salah/kurang/berlebih, aturan lampu salah, seluruh kombinasi masukan, isolasi antar-skenario, dan penjaga loop pada test runner.

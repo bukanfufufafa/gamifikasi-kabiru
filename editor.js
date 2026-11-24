@@ -1,4 +1,4 @@
-/* editor.js — Scratch-style block editor built on Blockly (lib/blockly.min.js, built from blockly-main).
+/* editor.js — Scratch-style block editor built on Blockly (blockly.min.js, built from blockly-main).
    - Defines the blocks for all quests, the toolbox (colored categories, filtered per level) and the Scratch look (Zelos renderer + custom theme).
    - Converts the workspace into the program tree that interpreter.js runs, and back (for "Show example").
    - Highlights the block that is running, like Scratch.
@@ -277,7 +277,7 @@ Petani.Editor = (function () {
     Blockly.common.defineBlocksWithJsonArray(BLOCK_DEFS);
     registerCategory();
     ws = Blockly.inject(host, {
-      toolbox: buildToolbox(tools || []), renderer: "zelos", theme: makeTheme(), media: "lib/media/", sounds: location.protocol !== "file:",
+      toolbox: buildToolbox(tools || []), renderer: "zelos", theme: makeTheme(), media: "./", sounds: location.protocol !== "file:",
       zoom: { controls: true, wheel: true, startScale: 0.8, maxScale: 1.8, minScale: 0.4, scaleSpeed: 1.2 },
       move: { scrollbars: true, drag: true, wheel: true },
       trashcan: true, maxInstances: { petani_start: 1 }

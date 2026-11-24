@@ -1,8 +1,8 @@
-/* Run with node tools/check-levels.js. No dependencies or browser required. */
+/* Run with node check-levels.js. No dependencies or browser required. */
 const fs = require("fs"), path = require("path"), assert = require("node:assert/strict");
 global.window = global;
 for (const f of ["config", "world", "interpreter"]) {
-  new Function(fs.readFileSync(path.join(__dirname, "..", "js", f + ".js"), "utf8")).call(global);
+  new Function(fs.readFileSync(path.join(__dirname, f + ".js"), "utf8")).call(global);
 }
 const { Config, World, Interpreter } = Petani;
 const conditionCount = (e) => !e ? 0 : 1 + conditionCount(e.a) + conditionCount(e.b);
