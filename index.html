@@ -9,7 +9,27 @@
 </head>
 <body class="kabiru-body">
 
-<audio id="page-load-sound" src="sound-effect.m4a" preload="auto" autoplay></audio>
+<audio id="page-load-sound" src="sound-effect.m4a" type="audio/mp4" preload="auto"></audio>
+<canvas id="rave-visualizer" aria-hidden="true"></canvas>
+<div id="rhythm-gallery" class="rhythm-gallery" aria-hidden="true">
+  <div class="rhythm-gallery__rail">
+    <span id="rhythm-gallery-progress" class="rhythm-gallery__rail-fill"></span>
+  </div>
+  <div id="rhythm-gallery-layer" class="rhythm-gallery__layer"></div>
+</div>
+<button id="sound-toggle" type="button" aria-pressed="false">&#9654; Putar audio</button>
+<p id="sound-status" role="status" aria-live="polite"></p>
+<div id="sound-subtitle" class="sound-subtitle" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
+  <div class="sound-subtitle__equalizer" aria-hidden="true">
+    <i></i><i></i><i></i><i></i><i></i>
+  </div>
+  <p class="sound-subtitle__line">
+    <span id="sound-subtitle-text" class="sound-subtitle__text" data-text=""></span>
+  </p>
+  <div class="sound-subtitle__track" aria-hidden="true">
+    <span id="sound-subtitle-progress" class="sound-subtitle__progress"></span>
+  </div>
+</div>
 
 <main class="kabiru-main" id="main-content">
 
@@ -157,25 +177,6 @@
 <script src="js/editor.js"></script>
 <script src="js/progress.js"></script>
 <script src="js/main.js"></script>
-<script>
-  const pageLoadSound = document.getElementById('page-load-sound');
-
-  window.addEventListener('load', () => {
-    const playPromise = pageLoadSound.play();
-
-    if (playPromise) {
-      playPromise.catch(() => {
-        const playAfterInteraction = () => {
-          pageLoadSound.play().catch(() => {});
-          document.removeEventListener('click', playAfterInteraction);
-          document.removeEventListener('keydown', playAfterInteraction);
-        };
-
-        document.addEventListener('click', playAfterInteraction, { once: true });
-        document.addEventListener('keydown', playAfterInteraction, { once: true });
-      });
-    }
-  });
-</script>
+<script src="js/rave-visualizer.js"></script>
 </body>
 </html>
