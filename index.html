@@ -9,6 +9,8 @@
 </head>
 <body class="kabiru-body">
 
+<audio id="page-load-sound" src="sound-effect.m4a" preload="auto" autoplay></audio>
+
 <main class="kabiru-main" id="main-content">
 
   <!-- TAMPILAN 1: PEMILIH JENJANG -> QUEST -> LEVEL -->
@@ -155,5 +157,25 @@
 <script src="js/editor.js"></script>
 <script src="js/progress.js"></script>
 <script src="js/main.js"></script>
+<script>
+  const pageLoadSound = document.getElementById('page-load-sound');
+
+  window.addEventListener('load', () => {
+    const playPromise = pageLoadSound.play();
+
+    if (playPromise) {
+      playPromise.catch(() => {
+        const playAfterInteraction = () => {
+          pageLoadSound.play().catch(() => {});
+          document.removeEventListener('click', playAfterInteraction);
+          document.removeEventListener('keydown', playAfterInteraction);
+        };
+
+        document.addEventListener('click', playAfterInteraction, { once: true });
+        document.addEventListener('keydown', playAfterInteraction, { once: true });
+      });
+    }
+  });
+</script>
 </body>
 </html>
