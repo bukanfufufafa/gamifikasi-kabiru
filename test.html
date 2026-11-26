@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Studio Batik · Coba di Baju</title>
+<style>
+:root{--bg:#1d1410;--panel:#2a1c15;--line:#4a3425;--ink:#f3e7cf;--mute:#b9a487;--gold:#d9a441;--indigo:#27456f}
+@media (prefers-color-scheme:light){:root{--bg:#f2e8d3;--panel:#fbf4e4;--line:#d6c29c;--ink:#2b1a10;--mute:#7a634a;--gold:#9c6a12;--indigo:#27456f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Georgia,"Times New Roman",serif}
+header{padding:28px clamp(16px,4vw,48px) 8px;max-width:1280px;margin:auto}
+h1{margin:0;font-size:clamp(28px,5vw,46px);letter-spacing:.01em;font-weight:400}
+header p{margin:6px 0 0;color:var(--mute);max-width:60ch}
+main{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:20px;max-width:1280px;margin:auto;padding:16px clamp(16px,4vw,48px) 48px}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+h2{margin:0 0 12px;font-size:20px;font-weight:400}
+label{display:block;font-size:14px;color:var(--mute);margin:12px 0 4px}
+select,input[type=range],input[type=color],button{font:inherit}
+select{width:100%;padding:8px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px}
+input[type=range]{width:100%;accent-color:var(--gold)}
+input[type=color]{width:100%;height:36px;border:1px solid var(--line);border-radius:6px;background:none;padding:2px}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{width:44px;height:44px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0}
+.chip:focus-visible,button:focus-visible,select:focus-visible,canvas:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+button.b{padding:10px 16px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+button.main{background:var(--gold);color:#1d1410;border-color:var(--gold);font-weight:bold}
+button.b:hover{border-color:var(--gold)}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+#tile{width:100%;max-width:340px;aspect-ratio:1;display:block;margin:0 auto;border:1px solid var(--line);border-radius:6px;cursor:crosshair;touch-action:none;image-rendering:auto}
+.stage{position:relative;background:#000;border-radius:8px;overflow:hidden;aspect-ratio:4/3;display:grid;place-items:center}
+#out{width:100%;height:100%;object-fit:contain;display:none}
+#out.mirror{transform:scaleX(-1)}
+#hint{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:#d8c8a8;font-size:15px}
+#status{margin:10px 0 0;color:var(--mute);font-size:14px;min-height:22px}
+video{display:none}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Studio Batik</h1>
+  <p>Rancang motif batik, lalu lihat langsung di bajumu lewat kamera. Pemrosesan berjalan di perangkatmu, tidak ada video yang dikirim ke server.</p>
+</header>
+<main>
+  <section aria-label="Desain batik">
+    <h2>Desain kain</h2>
+    <canvas id="tile" width="256" height="256" tabindex="0" aria-label="Kanvas motif batik, gambar dengan mouse atau jari"></canvas>
+    <label for="motif">Motif dasar</label>
+    <select id="motif">
+      <option value="parang">Parang</option>
+      <option value="kawung">Kawung</option>
+      <option value="mega">Mega mendung</option>
+      <option value="truntum">Truntum</option>
+      <option value="flora">Ceplok bunga</option>
+      <option value="none">Polos (gambar sendiri)</option>
+    </select>
+    <label>Palet warna</label>
+    <div class="chips" id="chips"></div>
+    <div class="row">
+      <div><label for="cBg">Latar</label><input type="color" id="cBg" value="#3b2314"></div>
+      <div><label for="cFg">Motif</label><input type="color" id="cFg" value="#d9a441"></div>
+      <div><label for="cAc">Aksen</label><input type="color" id="cAc" value="#f1e2c0"></div>
+    </div>
+    <label for="size">Ukuran kuas: <span id="sizeV">6</span></label>
+    <input type="range" id="size" min="1" max="30" value="6">
+    <div class="two">
+      <div><label for="sym">Simetri</label>
+        <select id="sym"><option value="1">Bebas</option><option value="4">Cermin 4 arah</option></select></div>
+      <div><label for="tool">Alat</label>
+        <select id="tool"><option value="draw">Kuas aksen</option><option value="fg">Kuas motif</option><option value="erase">Penghapus</option></select></div>
+    </div>
+    <div class="btns">
+      <button class="b" id="clear">Hapus coretan</button>
+      <button class="b" id="dlTile">Simpan motif (PNG)</button>
+    </div>
+  </section>
+
+  <section aria-label="Coba di baju">
+    <h2>Coba di baju</h2>
+    <div class="stage">
+      <canvas id="out"></canvas>
+      <div id="hint">Nyalakan kamera, lalu berdirilah agar baju terlihat jelas dengan cahaya cukup.</div>
+    </div>
+    <video id="cam" playsinline muted></video>
+    <div class="btns">
+      <button class="b main" id="start">Nyalakan kamera</button>
+      <button class="b" id="stop" disabled>Matikan</button>
+      <button class="b" id="flip" disabled>Ganti kamera</button>
+      <button class="b" id="snap" disabled>Ambil foto</button>
+      <button class="b" id="calib" disabled>Kalibrasi hadap depan</button>
+    </div>
+    <div class="two">
+      <div><label for="scale">Skala motif: <span id="scaleV">1.0</span></label><input type="range" id="scale" min="0.3" max="2" step="0.05" value="1"></div>
+      <div><label for="rot">Rotasi: <span id="rotV">0</span>°</label><input type="range" id="rot" min="-90" max="90" step="1" value="0"></div>
+      <div><label for="shade">Bayangan kain: <span id="shadeV">80</span>%</label><input type="range" id="shade" min="0" max="100" value="80"></div>
+      <div><label for="hem">Batas bawah baju: <span id="hemV">10</span>%</label><input type="range" id="hem" min="-10" max="50" value="10"></div>
+      <div><label for="fold">Ikut lipatan kain: <span id="foldV">50</span>%</label><input type="range" id="fold" min="0" max="100" value="50"></div>
+      <div><label for="turn">Putaran motif: <span id="turnV">100</span>%</label><input type="range" id="turn" min="0" max="150" value="100"></div>
+      <div><label for="crack">Retakan malam: <span id="crackV">30</span>%</label><input type="range" id="crack" min="0" max="100" value="30"></div>
+      <div><label><input type="checkbox" id="arm" checked> Pemetaan lengan baju</label></div>
+      <div><label for="opa">Kepekatan: <span id="opaV">95</span>%</label><input type="range" id="opa" min="30" max="100" value="95"></div>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+  </section>
+</main>
+
+<script type="module">
+const $=id=>document.getElementById(id);
+const S=256;
+/* ---------- Desain kain ---------- */
+const tile=$('tile'),tctx=tile.getContext('2d');
+const base=document.createElement('canvas'),layer=document.createElement('canvas');
+base.width=base.height=layer.width=layer.height=S;
+const bctx=base.getContext('2d'),lctx=layer.getContext('2d');
+let dirty=true,texDirty=true;
+const palettes=[['#3b2314','#d9a441','#f1e2c0'],['#102a4c','#f1e6c8','#7fa7d6'],['#6e1a1a','#f4d9a0','#1b1b1b'],['#16392e','#e8c872','#f4efe1']];
+const chips=$('chips');
+palettes.forEach((p,i)=>{const b=document.createElement('button');b.className='chip';b.setAttribute('aria-label','Palet '+(i+1));
+  b.style.background=`linear-gradient(135deg,${p[0]} 50%,${p[1]} 50%)`;
+  b.onclick=()=>{$('cBg').value=p[0];$('cFg').value=p[1];$('cAc').value=p[2];render()};chips.appendChild(b)});
+
+function wrap(g,fn){for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){g.save();g.translate(i*S,j*S);fn();g.restore()}}
+const motifs={
+ kawung(g,bg,fg,ac){wrap(g,()=>{for(let i=0;i<2;i++)for(let j=0;j<2;j++){const cx=64+128*i,cy=64+128*j;
+  for(let k=0;k<4;k++){const a=k*Math.PI/2;g.beginPath();g.ellipse(cx+Math.cos(a)*26,cy+Math.sin(a)*26,38,19,a,0,7);g.fillStyle=fg;g.fill();g.lineWidth=2;g.strokeStyle=bg;g.stroke()}
+  g.beginPath();g.arc(cx,cy,6,0,7);g.fillStyle=ac;g.fill()}})},
+ parang(g,bg,fg,ac){wrap(g,()=>{for(let i=-3;i<=3;i++){const c=i*S/4;
+  for(const [w,col,off] of [[16,fg,0],[3,ac,16]]){g.beginPath();for(let x=-S;x<=2*S;x+=4){const y=x+c+off+14*Math.sin(2*Math.PI*2*x/S);x===-S?g.moveTo(x,y):g.lineTo(x,y)}
+   g.lineWidth=w;g.strokeStyle=col;g.lineCap='round';g.stroke()}
+  for(let x=0;x<S;x+=S/4){g.beginPath();g.arc(x+S/8,x+S/8+c+34,3,0,7);g.fillStyle=ac;g.fill()}}})},
+ mega(g,bg,fg,ac){wrap(g,()=>{for(const [cx,cy] of [[64,150],[192,22],[192,278],[64,-106]]){
+  for(let r=58,n=0;r>6;r-=9,n++){g.beginPath();g.ellipse(cx,cy,r*1.5,r,0,Math.PI,2*Math.PI);g.closePath();g.fillStyle=n%2?ac:fg;g.fill();g.lineWidth=1.5;g.strokeStyle=bg;g.stroke()}}})},
+ truntum(g,bg,fg,ac){wrap(g,()=>{for(let i=0;i<4;i++)for(let j=0;j<4;j++){const x=i*64+(j%2?32:0)+16,y=j*64+16;g.save();g.translate(x,y);g.strokeStyle=fg;g.lineWidth=3;g.lineCap='round';
+  for(let k=0;k<4;k++){g.rotate(Math.PI/4);g.beginPath();g.moveTo(-13,0);g.lineTo(13,0);g.stroke()}
+  g.fillStyle=ac;for(const [dx,dy] of [[24,0],[-24,0],[0,24],[0,-24]]){g.beginPath();g.arc(dx,dy,2.5,0,7);g.fill()}g.restore()}})},
+ flora(g,bg,fg,ac){wrap(g,()=>{for(const [cx,cy] of [[64,64],[192,192]]){for(let k=0;k<8;k++){const a=k*Math.PI/4;g.beginPath();g.ellipse(cx+Math.cos(a)*28,cy+Math.sin(a)*28,22,10,a,0,7);g.fillStyle=fg;g.fill();g.lineWidth=2;g.strokeStyle=ac;g.stroke()}
+  g.beginPath();g.arc(cx,cy,12,0,7);g.fillStyle=ac;g.fill()}
+  for(const [cx,cy] of [[192,64],[64,192]]){g.save();g.translate(cx,cy);for(let k=0;k<4;k++){g.rotate(Math.PI/2);g.beginPath();g.moveTo(0,0);g.quadraticCurveTo(14,-20,0,-40);g.quadraticCurveTo(-14,-20,0,0);g.fillStyle=ac;g.fill()}g.restore()}})},
+ none(){}
+};
+function render(){
+  const bg=$('cBg').value,fg=$('cFg').value,ac=$('cAc').value;
+  bctx.fillStyle=bg;bctx.fillRect(0,0,S,S);motifs[$('motif').value](bctx,bg,fg,ac);compose();
+}
+function compose(){tctx.drawImage(base,0,0);tctx.drawImage(layer,0,0);dirty=texDirty=true}
+['motif','cBg','cFg','cAc'].forEach(id=>$(id).addEventListener('input',render));
+$('size').oninput=e=>$('sizeV').textContent=e.target.value;
+$('clear').onclick=()=>{lctx.clearRect(0,0,S,S);compose()};
+$('dlTile').onclick=()=>{const a=document.createElement('a');a.href=tile.toDataURL('image/png');a.download='motif-batik.png';a.click()};
+
+let last=null;
+function stroke(x0,y0,x1,y1){
+  const t=$('tool').value,sz=+$('size').value;
+  lctx.lineWidth=sz;lctx.lineCap=lctx.lineJoin='round';
+  lctx.globalCompositeOperation=t==='erase'?'destination-out':'source-over';
+  lctx.strokeStyle=t==='fg'?$('cFg').value:$('cAc').value;
+  const pts=[[x0,y0,x1,y1]];
+  if($('sym').value==='4')pts.push([S-x0,y0,S-x1,y1],[x0,S-y0,x1,S-y1],[S-x0,S-y0,S-x1,S-y1]);
+  for(const [a,b,c,d] of pts)for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){lctx.beginPath();lctx.moveTo(a+i*S,b+j*S);lctx.lineTo(c+i*S+.01,d+j*S);lctx.stroke()}
+  compose();
+}
+const pos=e=>{const r=tile.getBoundingClientRect();return[(e.clientX-r.left)*S/r.width,(e.clientY-r.top)*S/r.height]};
+tile.addEventListener('pointerdown',e=>{tile.setPointerCapture(e.pointerId);last=pos(e);stroke(...last,...last)});
+tile.addEventListener('pointermove',e=>{if(!last)return;const p=pos(e);stroke(...last,...p);last=p});
+['pointerup','pointercancel'].forEach(n=>tile.addEventListener(n,()=>last=null));
+render();
+
+/* ---------- Kamera + segmentasi pakaian ---------- */
+const cam=$('cam'),out=$('out'),octx=out.getContext('2d'),status=$('status');
+const fab=document.createElement('canvas'),fctx=fab.getContext('2d');
+const shd=document.createElement('canvas'),sctx=shd.getContext('2d');
+const mk=document.createElement('canvas'),mctx=mk.getContext('2d');
+let seg=null,pose=null,G=null,GL=null,visS=[0,0,0,0],yawS=0,refR=0,lastR0=1,exuPrev=null,cut={ok:false,X:.5,Y:1,sl:0},poseLost=99,pf=0,stream=null,facing='user',running=false,pattern=null,alpha=null,cx=0,cy=0,bw=0,lastT=-1;
+const setS=t=>status.textContent=t;
+for(const id of ['scale','rot','shade','opa','hem','fold','turn','crack'])$(id).addEventListener('input',()=>$(id+'V').textContent=(id==='scale'?(+$(id).value).toFixed(1):$(id).value));
+
+async function loadAI(){
+  if(seg)return;
+  setS('Memuat model AI (sekali saja, ±16 MB)…');
+  const {ImageSegmenter,PoseLandmarker,FilesetResolver}=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+  const fs=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+  const opt=d=>({baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite',delegate:d},runningMode:'VIDEO',outputCategoryMask:true,outputConfidenceMasks:false});
+  try{seg=await ImageSegmenter.createFromOptions(fs,opt('GPU'))}catch{seg=await ImageSegmenter.createFromOptions(fs,opt('CPU'))}
+  const po=d=>({baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',delegate:d},runningMode:'VIDEO',numPoses:1});
+  try{pose=await PoseLandmarker.createFromOptions(fs,po('GPU'))}catch{pose=await PoseLandmarker.createFromOptions(fs,po('CPU'))}
+  GL=initGL();
+}
+async function startCam(){
+  try{
+    $('start').disabled=true;
+    await loadAI();
+    stream?.getTracks().forEach(t=>t.stop());
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:960},height:{ideal:720}},audio:false});
+    cam.srcObject=stream;await cam.play();
+    const w=cam.videoWidth,h=cam.videoHeight;
+    for(const c of [out,fab,shd,mk]){c.width=w;c.height=h}
+    alpha=new Float32Array(w*h);cx=w/2;cy=h/2;bw=w*.5;
+    out.style.display='block';out.classList.toggle('mirror',facing==='user');$('hint').style.display='none';
+    ['stop','flip','snap','calib'].forEach(i=>$(i).disabled=false);
+    setS('Kamera aktif. Baju terdeteksi otomatis, coba gerak pelan.');
+    if(!running){running=true;loop()}
+  }catch(e){
+    $('start').disabled=false;
+    setS(e.name==='NotAllowedError'?'Izin kamera ditolak. Aktifkan izin kamera di browser, lalu coba lagi.':'Gagal memulai: '+e.message+' (kamera butuh HTTPS atau localhost).');
+  }
+}
+function stopCam(){running=false;stream?.getTracks().forEach(t=>t.stop());stream=null;out.style.display='none';$('hint').style.display='grid';
+  $('start').disabled=false;['stop','flip','snap','calib'].forEach(i=>$(i).disabled=true);setS('Kamera dimatikan.')}
+$('calib').onclick=()=>{refR=lastR0;yawS=0;setS('Terkalibrasi: posisi hadap depan sekarang dianggap 0°.')};
+$('start').onclick=startCam;$('stop').onclick=stopCam;
+$('flip').onclick=()=>{facing=facing==='user'?'environment':'user';startCam()};
+$('snap').onclick=()=>{const c=document.createElement('canvas');c.width=out.width;c.height=out.height;const g=c.getContext('2d');
+  if(facing==='user'){g.translate(c.width,0);g.scale(-1,1)}g.drawImage(out,0,0);
+  const a=document.createElement('a');a.href=c.toDataURL('image/jpeg',.92);a.download='coba-batik.jpg';a.click()};
+
+function onMask(res){
+  const m=res.categoryMask;if(!m)return;
+  const d=m.getAsUint8Array(),w=m.width,h=m.height;
+  if(mk.width!==w||mk.height!==h){mk.width=w;mk.height=h;alpha=new Float32Array(w*h)}
+  const img=mctx.createImageData(w,h),px=img.data;
+  let n=0,sx=0,sy=0,x0=w,x1=0;
+  for(let i=0;i<d.length;i++){
+    const x=i%w,y=(i/w)|0;
+    const lim=cut.ok?cut.Y*h+cut.sl*(x-cut.X*w):1e9;   // garis batas pinggul (celana dibuang)
+    const t=(d[i]===4&&y<=lim)?1:0;                  // kategori 4 = pakaian, hanya bagian atas
+    const a=alpha[i]=alpha[i]*.55+t*.45;       // haluskan antar-frame agar tidak berkedip
+    if(a>.04){px[i*4+3]=Math.min(255,a*300);}
+    if(t){n++;sx+=x;sy+=y;if(x<x0)x0=x;if(x>x1)x1=x}
+  }
+  mctx.putImageData(img,0,0);
+  if(n>w*h*.01){const k=.15;cx+=(sx/n-cx)*k;cy+=(sy/n-cy)*k;bw+=((x1-x0)-bw)*k}
+}
+/* ---------- Warp kain mengikuti badan (WebGL) ----------
+   Koordinat kain dihitung per piksel dari bahu & pinggul: ikut miring/rotasi badan, menyempit
+   ke pinggang, melengkung seperti silinder di sisi badan, dan bergeser mengikuti lipatan baju. */
+const FS=`
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+varying vec2 uv;
+uniform vec2 res,M,ey,exu,uLs,uLe,uLw,uRs,uRe,uRw;
+uniform vec4 en;
+uniform float shW,hipW,tilePx,rot,disp,yaw,refL,shadeK,crack;
+uniform sampler2D tex,vid,msk;
+// satu ruas lengan: (skor jarak, posisi sepanjang lengan px, posisi menyilang px)
+vec4 seg(vec2 p,vec2 A,vec2 B,float rad){
+  vec2 ab=B-A;float L=max(length(ab),1.);vec2 dir=ab/L;vec2 ap=p-A;
+  float t=dot(ap,dir),tc=clamp(t,0.,L);
+  float sc=length(ap-dir*tc)/rad+max(-t/L,0.)*3.;   // sebelum bahu dihukum agar dada tetap ikut peta badan
+  return vec4(sc,t,dot(ap,vec2(-dir.y,dir.x)),L);
+}
+float lum(vec2 c){return dot(texture2D(vid,c).rgb,vec3(.3,.59,.11));}
+vec2 h2(vec2 p){p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));return fract(sin(p)*43758.5453);}
+float h1(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+float cell(vec2 p){vec2 i=floor(p),f=fract(p);float d1=9.,d2=9.;
+  for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){vec2 g=vec2(float(x),float(y));float d=length(g+h2(i+g)-f);if(d<d1){d2=d1;d1=d;}else if(d<d2)d2=d;}
+  return d2-d1;}
+void main(){
+  vec2 px=vec2(uv.x*res.x,(1.-uv.y)*res.y),d=px-M;
+  float det=exu.x*ey.y-exu.y*ey.x;
+  float a=(d.x*ey.y-d.y*ey.x)/det, b=(exu.x*d.y-exu.y*d.x)/det;
+  float R=.5*mix(shW,hipW,clamp(b,0.,1.))/max(cos(yaw),.3);
+  float sc=clamp(a/R,-.97,.97);
+  vec2 q=vec2(R*(asin(sc)-yaw)+(a-R*sc), b*length(ey));
+  // lengan baju: koordinat kain sendiri (silinder kecil sepanjang bahu-siku-pergelangan)
+  float el0=shW/1.25,ra=.3*el0,rf=.25*el0;
+  vec4 s0=seg(px,uLs,uLe,ra),s1=seg(px,uLe,uLw,rf),s2=seg(px,uRs,uRe,ra),s3=seg(px,uRe,uRw,rf);
+  s0.x+=(1.-en.x)*9.;s1.x+=(1.-en.y)*9.;s2.x+=(1.-en.z)*9.;s3.x+=(1.-en.w)*9.;
+  vec4 bs=s0;float off=0.,sd=-1.,rr=ra;
+  if(s1.x<bs.x){bs=s1;off=length(uLe-uLs);sd=-1.;rr=rf;}
+  if(s2.x<bs.x){bs=s2;off=0.;sd=1.;rr=ra;}
+  if(s3.x<bs.x){bs=s3;off=length(uRe-uRs);sd=1.;rr=rf;}
+  if(bs.x<1.15){float sa=clamp(bs.z/rr,-.97,.97);sc=sa;q=vec2(rr*asin(sa)+(bs.z-rr*sa)+sd*.4*tilePx,bs.y+off);}
+  vec2 st=px/res,o=vec2(5.)/res;
+  q+=disp*vec2(lum(st+vec2(o.x,0.))-lum(st-vec2(o.x,0.)), lum(st+vec2(0.,o.y))-lum(st-vec2(0.,o.y)));
+  float c=cos(rot),s=sin(rot);
+  vec2 qn=vec2(c*q.x-s*q.y,s*q.x+c*q.y)/tilePx;
+  vec3 col=texture2D(tex,qn).rgb;
+  // tepi baju: mask diperhalus lalu dipertajam
+  vec2 m3=vec2(3.)/res;
+  float m=(texture2D(msk,st).a*2.+texture2D(msk,st+vec2(m3.x,0.)).a+texture2D(msk,st-vec2(m3.x,0.)).a+texture2D(msk,st+vec2(0.,m3.y)).a+texture2D(msk,st-vec2(0.,m3.y)).a)/6.;
+  float al=smoothstep(.3,.7,m);
+  // pencahayaan: rasio terang baju asli terhadap rata-ratanya (bayangan, lipatan, kilap), berlaku untuk baju gelap maupun terang
+  vec2 o2=vec2(2.)/res;
+  float L=(lum(st)*2.+lum(st+vec2(o2.x,0.))+lum(st-vec2(o2.x,0.))+lum(st+vec2(0.,o2.y))+lum(st-vec2(0.,o2.y)))/6.;
+  float rel=clamp(L/max(refL,.06),.3,2.);
+  col*=mix(1.,pow(rel,1.1),shadeK);
+  col+=smoothstep(1.2,1.8,rel)*.22*shadeK;
+  col*=1.-.32*pow(abs(sc),3.);                      // sisi badan lebih gelap (kain melengkung)
+  // serat anyaman
+  vec2 tw=qn*64.;
+  float fa=smoothstep(1.2,3.,tilePx/64.);
+  col*=1.+fa*(.05*sin(tw.x*6.2832)*sin(tw.y*6.2832)+.07*(h1(floor(tw))-.5));
+  // retakan malam khas batik
+  float cr=1.-smoothstep(0.,.05,cell(qn*3.));
+  col=mix(col,col*vec3(.55,.5,.45),cr*crack);
+  gl_FragColor=vec4(col*al,al);
+}`;
+function initGL(){
+  const gc=document.createElement('canvas'),gl=gc.getContext('webgl',{preserveDrawingBuffer:true});
+  if(!gl)return null;
+  const mk2=(t,src)=>{const o=gl.createShader(t);gl.shaderSource(o,src);gl.compileShader(o);return o};
+  const pr=gl.createProgram();
+  gl.attachShader(pr,mk2(gl.VERTEX_SHADER,'attribute vec2 p;varying vec2 uv;void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}'));
+  gl.attachShader(pr,mk2(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);
+  if(!gl.getProgramParameter(pr,gl.LINK_STATUS)){console.error(gl.getProgramInfoLog(pr));return null}
+  gl.useProgram(pr);
+  gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const loc=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  const u=n=>gl.getUniformLocation(pr,n),tex=n=>{const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0+n);gl.bindTexture(gl.TEXTURE_2D,t);return t};
+  const tT=tex(0);
+  const lin=()=>{for(const p of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR)};
+  tex(1);lin();tex(2);lin();
+  gl.uniform1i(u('tex'),0);gl.uniform1i(u('vid'),1);gl.uniform1i(u('msk'),2);
+  return{gc,gl,u,tT};
+}
+const sm=document.createElement('canvas');sm.width=48;sm.height=36;
+const smc=sm.getContext('2d',{willReadFrequently:true});let refL=.4;
+function shirtLum(){                       // terang rata-rata baju asli, sebagai acuan bayangan
+  smc.drawImage(cam,0,0,48,36);const d=smc.getImageData(0,0,48,36).data,W=mk.width,H=mk.height;
+  let t=0,n=0;
+  for(let y=0;y<36;y++)for(let x=0;x<48;x++)if(alpha[((y*H/36)|0)*W+((x*W/48)|0)]>.6){const i=(y*48+x)*4;t+=(.3*d[i]+.59*d[i+1]+.11*d[i+2])/255;n++}
+  if(n>20)refL+=(t/n-refL)*.12;
+}
+function drawGL(w,h){
+  const {gc,gl,u,tT}=GL,g=G;
+  if(gc.width!==w||gc.height!==h){gc.width=w;gc.height=h}
+  gl.viewport(0,0,w,h);
+  if(texDirty){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tT);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,tile);gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);texDirty=false}
+  shirtLum();
+  gl.activeTexture(gl.TEXTURE1);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,cam);
+  gl.activeTexture(gl.TEXTURE2);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,mk);
+  const mx=(g[0]+g[2])/2,my=(g[1]+g[3])/2,hx=(g[4]+g[6])/2,hy=(g[5]+g[7])/2;
+  let ex=[g[2]-g[0],g[3]-g[1]],el=Math.hypot(...ex)||1,ey=[hx-mx,hy-my];
+  if(Math.hypot(...ey)<8)ey=[0,el];
+  const hipW=Math.max(.6*el,Math.min(1.2*el,Math.hypot(g[6]-g[4],g[7]-g[5])));
+  gl.uniform2f(u('res'),w,h);gl.uniform2f(u('M'),mx,my);gl.uniform2f(u('ey'),ey[0],ey[1]);let exu=[ex[0]/el,ex[1]/el];
+  if(el<.12*Math.hypot(...ey)&&exuPrev)exu=exuPrev;else exuPrev=exu;   // saat hampir menyamping, sumbu bahu tak stabil
+  const yaw=yawS*(+$('turn').value/100);
+  gl.uniform1f(u('yaw'),yaw);gl.uniform2f(u('exu'),exu[0],exu[1]);
+  gl.uniform1f(u('shW'),el*1.25);gl.uniform1f(u('hipW'),hipW*1.25);
+  gl.uniform1f(u('tilePx'),Math.max(20,el/Math.max(Math.cos(yaw),.3)*.75*+$('scale').value));
+  gl.uniform1f(u('rot'),+$('rot').value*Math.PI/180);
+  gl.uniform1f(u('disp'),+$('fold').value/100*el*.9);
+  const on=$('arm').checked?1:0,sl=[Math.hypot(g[8]-g[0],g[9]-g[1]),Math.hypot(g[12]-g[8],g[13]-g[9]),Math.hypot(g[10]-g[2],g[11]-g[3]),Math.hypot(g[14]-g[10],g[15]-g[11])];
+  gl.uniform2f(u('uLs'),g[0],g[1]);gl.uniform2f(u('uRs'),g[2],g[3]);gl.uniform2f(u('uLe'),g[8],g[9]);
+  gl.uniform2f(u('uRe'),g[10],g[11]);gl.uniform2f(u('uLw'),g[12],g[13]);gl.uniform2f(u('uRw'),g[14],g[15]);
+  gl.uniform4f(u('en'),...visS.map((x,i)=>on&&x>.5&&sl[i]>.12*el?1:0));
+  gl.uniform1f(u('refL'),refL);gl.uniform1f(u('shadeK'),+$('shade').value/100);gl.uniform1f(u('crack'),+$('crack').value/100);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+}
+function frame(){
+  const w=out.width,h=out.height;
+  if(GL&&G&&cut.ok){
+    drawGL(w,h);octx.globalCompositeOperation='source-over';octx.globalAlpha=1;octx.drawImage(cam,0,0,w,h);
+    octx.globalAlpha=+$('opa').value/100;octx.drawImage(GL.gc,0,0);octx.globalAlpha=1;return;
+  }
+  if(dirty||!pattern){pattern=fctx.createPattern(tile,'repeat');dirty=false}
+  const sc=+$('scale').value*Math.max(.5,Math.min(2,bw/(w*.5)))*1.1;
+  pattern.setTransform(new DOMMatrix().translateSelf(cx,cy).rotateSelf(+$('rot').value).scaleSelf(sc).translateSelf(-S/2,-S/2));
+  fctx.globalCompositeOperation='source-over';fctx.globalAlpha=1;fctx.clearRect(0,0,w,h);
+  if(GL&&G){drawGL(w,h);fctx.drawImage(GL.gc,0,0)}else{fctx.fillStyle=pattern;fctx.fillRect(0,0,w,h)}
+  // bayangan & lipatan asli baju (luminans) dipindah ke kain
+  sctx.globalCompositeOperation='source-over';sctx.drawImage(cam,0,0,w,h);
+  sctx.globalCompositeOperation='saturation';sctx.fillStyle='#808080';sctx.fillRect(0,0,w,h);
+  sctx.globalCompositeOperation='lighter';sctx.fillStyle='rgb(45,45,45)';sctx.fillRect(0,0,w,h);
+  fctx.globalCompositeOperation='overlay';fctx.globalAlpha=+$('shade').value/100;fctx.drawImage(shd,0,0);
+  fctx.globalCompositeOperation='destination-in';fctx.globalAlpha=1;
+  if('filter' in fctx)fctx.filter='blur(2px)';
+  fctx.drawImage(mk,0,0,w,h);
+  if('filter' in fctx)fctx.filter='none';
+  octx.globalCompositeOperation='source-over';octx.globalAlpha=1;octx.drawImage(cam,0,0,w,h);
+  if(cut.ok){octx.globalAlpha=+$('opa').value/100;octx.drawImage(fab,0,0);octx.globalAlpha=1}
+}
+function trackPose(){
+  const pr=pose.detectForVideo(cam,performance.now()),L=pr.landmarks?.[0],WL=pr.worldLandmarks?.[0];
+  if(!L){poseLost++;if(poseLost>12&&cut.ok){cut.ok=false;setS('Badan belum terdeteksi. Mundur sedikit agar bahu dan pinggang terlihat.')}return}
+  if(poseLost>12)setS('Kamera aktif. Hanya baju yang diberi batik, celana tetap asli.');
+  poseLost=0;
+  const w=out.width,h=out.height,off=+$('hem').value/100;
+  const sh=(L[11].y+L[12].y)/2,hy=(L[23].y+L[24].y)/2,hx=(L[23].x+L[24].x)/2;
+  const Y=hy+Math.max(.05,hy-sh)*off;
+  const dx=(L[24].x-L[23].x)*w,dy=(L[24].y-L[23].y)*h;
+  const sl=Math.max(-1,Math.min(1,dy/(Math.abs(dx)<1?(dx<0?-1:1):dx)));
+  if(!cut.ok){cut={ok:true,X:hx,Y,sl}}else{cut.X+=(hx-cut.X)*.4;cut.Y+=(Y-cut.Y)*.4;cut.sl+=(sl-cut.sl)*.4}
+  const q=[11,12,23,24,13,14,15,16].flatMap(i=>[L[i].x*w,L[i].y*h]);          // bahu kiri/kanan, pinggul kiri/kanan (px)
+  if(G){let sp=0;for(let i=0;i<8;i++)sp+=Math.abs(q[i]-G[i]);const k=Math.min(.85,.12+sp/8*.05);G=G.map((v,i)=>v+(q[i]-v)*k)}else G=q;
+  const vz=i=>L[i].visibility??1,raw=[Math.min(vz(11),vz(13)),Math.min(vz(13),vz(15)),Math.min(vz(12),vz(14)),Math.min(vz(14),vz(16))];
+  visS=visS.map((x,i)=>x+(raw[i]-x)*.3);               // kepercayaan tiap ruas lengan (dihaluskan)
+  /* Putaran badan (yaw), digabung dari 3 petunjuk karena tiap sinyal sendiri kurang stabil:
+     1) lebar bahu di layar menyempit dibanding posisi hadap depan (besar sudut)
+     2) selisih kedalaman bahu di koordinat 3D model (besar sudut)
+     3) hidung bergeser ke kiri/kanan dari tengah bahu (arah putaran) */
+  const el=Math.hypot(G[2]-G[0],G[3]-G[1])||1,mx=(G[0]+G[2])/2,my=(G[1]+G[3])/2;
+  const tl=Math.hypot((G[4]+G[6])/2-mx,(G[5]+G[7])/2-my)||1;
+  lastR0=Math.min(1.8,el/tl);
+  if(!refR||lastR0>refR)refR=lastR0; else refR=Math.max(refR*.9997,lastR0);   // referensi hadap depan, menyesuaikan sendiri
+  let mag=Math.acos(Math.min(1,lastR0/refR));
+  if(WL)mag=.4*mag+.6*Math.atan2(Math.abs(WL[12].z-WL[11].z),Math.abs(WL[12].x-WL[11].x));
+  mag=Math.min(1.2,Math.max(0,mag-.08));                                        // abaikan goyangan kecil
+  const sgn=Math.max(-1,Math.min(1,((L[0].x*w-mx)/el)/.08));                    // + = badan menghadap ke kanan layar
+  yawS+=(sgn*mag-yawS)*.3;
+}
+function loop(){
+  if(!running)return;
+  if(cam.readyState>=2&&cam.currentTime!==lastT){
+    lastT=cam.currentTime;
+    try{
+      if(pf++%2===0)trackPose();
+      seg.segmentForVideo(cam,performance.now(),onMask);frame()}catch(e){console.error(e)}
+  }
+  (cam.requestVideoFrameCallback?cam.requestVideoFrameCallback.bind(cam):requestAnimationFrame)(loop);
+}
+</script>
+</body>
+</html>
